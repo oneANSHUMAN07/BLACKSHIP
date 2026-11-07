@@ -1,0 +1,208 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-display: "Barlow Condensed", sans-serif;
+  --font-sans: "Plus Jakarta Sans", sans-serif;
+  --font-mono: "Space Mono", monospace;
+
+  --color-obsidian-950: #030304;
+  --color-obsidian-900: #08080a;
+  --color-obsidian-850: #0d0e12;
+  --color-obsidian-800: #131418;
+  --color-obsidian-750: #191a20;
+  --color-obsidian-700: #22232a;
+}
+
+@layer base {
+  body {
+    background-color: #060608;
+    color: #f4f4f5;
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, .font-editorial {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Luxury hairline subtle grid & noise backdrop */
+.bg-grid-subtle {
+  background-size: 60px 60px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+}
+
+/* Subtle cinematic metallic radial spotlight */
+.spotlight-radial {
+  background: radial-gradient(ellipse 70% 50% at 50% -20%, rgba(255, 255, 255, 0.12), transparent 70%);
+}
+
+/* Fixed wide elliptical spotlight directly beneath the sculpture matching NORTHLINE reference */
+.sculpture-floor-spotlight {
+  background: radial-gradient(
+    ellipse 65% 30% at 50% 50%,
+    rgba(245, 248, 255, 0.36) 0%,
+    rgba(225, 232, 245, 0.17) 30%,
+    rgba(180, 190, 210, 0.055) 58%,
+    transparent 80%
+  );
+  filter: blur(2px);
+}
+
+/* Subtle blurred reflection beneath the floating ring */
+.sculpture-floor-reflection {
+  background: radial-gradient(
+    ellipse 58% 24% at 50% 50%,
+    rgba(235, 240, 250, 0.22) 0%,
+    rgba(190, 200, 220, 0.075) 42%,
+    transparent 76%
+  );
+  filter: blur(18px);
+}
+
+.sculpture-floor-shadow {
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.28) 48%, transparent 78%);
+  filter: blur(10px);
+}
+
+@keyframes hero-arrow-float {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(4px); }
+}
+
+.hero-arrow-float {
+  animation: hero-arrow-float 1.2s ease-in-out infinite;
+}
+
+.group:hover .hero-arrow-float {
+  animation-duration: 0.65s;
+}
+
+/* Spinning border button keyframe */
+@keyframes spin-border {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-border {
+  animation: spin-border 6s linear infinite;
+}
+
+/* Hero Headline Metallic Light Sweep Animation */
+@keyframes metallic-light-sweep {
+  0% {
+    background-position: -200% 0;
+  }
+  42% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.headline-metallic-sweep {
+  background: linear-gradient(
+    110deg,
+    #ececf0 0%,
+    #a1a1aa 18%,
+    #ffffff 38%,
+    #ffffff 44%,
+    #d4d4d8 50%,
+    #71717a 65%,
+    #ececf0 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: metallic-light-sweep 6.5s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  display: inline-block;
+  will-change: background-position;
+}
+
+/* Dark cinematic studio spotlight backdrop (Visibly applied directly to Hero section) */
+.hero-studio-backdrop {
+  position: relative;
+  background-color: #060608;
+  background-image:
+    /* 1. Floor Reflection: Wide elliptical silver pool across bottom */
+    radial-gradient(ellipse 90% 28% at 50% 90%, rgba(200, 210, 225, 0.32) 0%, rgba(140, 150, 170, 0.18) 35%, rgba(40, 44, 54, 0.45) 65%, transparent 85%),
+    /* 2. Central Wall Spotlight: Soft diffused silver illumination */
+    radial-gradient(ellipse 65% 58% at 50% 42%, rgba(215, 225, 240, 0.28) 0%, rgba(140, 150, 168, 0.18) 30%, rgba(45, 50, 62, 0.55) 60%, rgba(12, 14, 18, 0.95) 85%, transparent 100%),
+    /* 3. Deep Charcoal-to-Black Studio Gradient */
+    linear-gradient(to bottom, #08090c 0%, #13151c 35%, #181b24 60%, #0d0f14 85%, #060608 100%);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+.hero-studio-backdrop::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: auto 0 0;
+  height: clamp(80px, 12vh, 150px);
+  background: linear-gradient(to bottom, transparent 0%, rgba(7, 7, 9, 0.72) 55%, #070709 100%);
+  pointer-events: none;
+}
+
+/* Card Hand Continuous Floating Movement Keyframes */
+@keyframes float-card-0 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-7px) rotate(0.6deg); }
+}
+
+@keyframes float-card-1 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-9px) rotate(-0.7deg); }
+}
+
+@keyframes float-card-2 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(0.4deg); }
+}
+
+@keyframes float-card-3 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(-0.5deg); }
+}
+
+@keyframes float-card-4 {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-7px) rotate(0.6deg); }
+}
+
+.card-float-0 { animation: float-card-0 6.2s ease-in-out infinite; }
+.card-float-1 { animation: float-card-1 5.4s ease-in-out infinite 0.8s; }
+.card-float-2 { animation: float-card-2 7.0s ease-in-out infinite 0.3s; }
+.card-float-3 { animation: float-card-3 5.8s ease-in-out infinite 1.2s; }
+.card-float-4 { animation: float-card-4 6.5s ease-in-out infinite 1.6s; }
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin-border,
+  .hero-arrow-float,
+  .animate-sculpture-3d,
+  .headline-metallic-sweep,
+  .card-float-0,
+  .card-float-1,
+  .card-float-2,
+  .card-float-3,
+  .card-float-4,
+  .animate-pulse {
+    animation: none !important;
+  }
+
+  .headline-metallic-sweep {
+    -webkit-text-fill-color: #f4f4f5 !important;
+    background: none !important;
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "BLACKSHIP — Autonomous Brand Governance",
+  "description": "AI-powered brand governance that keeps every message, asset and campaign aligned with your identity.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

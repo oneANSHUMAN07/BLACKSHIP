@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BLACKSHIP — 3D Ring Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; overflow-x: hidden; color: #f4f4f5; background: #060608; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .hero { min-height: 92vh; padding: 128px max(6vw, 24px) 72px; display: grid; grid-template-columns: 1.25fr .9fr; gap: 28px; align-items: center; overflow: hidden; background: radial-gradient(ellipse 90% 28% at 50% 90%, rgba(200,210,225,.32), rgba(140,150,170,.18) 35%, rgba(40,44,54,.45) 65%, transparent 85%), radial-gradient(ellipse 65% 58% at 50% 42%, rgba(215,225,240,.28), rgba(140,150,168,.18) 30%, rgba(45,50,62,.55) 60%, rgba(12,14,18,.95) 85%, transparent), linear-gradient(#08090c, #13151c 35%, #181b24 60%, #0d0f14 85%, #060608); }
+    .eyebrow { color: #a1a1aa; font-size: 11px; letter-spacing: .25em; text-transform: uppercase; }
+    h1 { margin: 24px 0; font: 900 clamp(54px, 7.8vw, 108px)/.92 'Barlow Condensed', sans-serif; letter-spacing: -.015em; text-transform: uppercase; background: linear-gradient(110deg,#ececf0,#a1a1aa 18%,#fff 38%,#d4d4d8 50%,#71717a 65%,#ececf0); color: transparent; background-clip: text; }
+    p { max-width: 520px; margin: 0; color: #a1a1aa; font-size: 16px; line-height: 1.8; }
+    .actions { display: flex; gap: 14px; margin-top: 34px; flex-wrap: wrap; }
+    .actions span { padding: 13px 18px; border: 1px solid rgba(255,255,255,.62); border-radius: 3px; color: white; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+    .visual { position: relative; width: min(100%, 460px); aspect-ratio: 1; justify-self: center; }
+    .visual::before { content: ''; position: absolute; z-index: 0; width: 110%; height: 44%; left: -5%; bottom: -4%; border-radius: 50%; background: radial-gradient(ellipse,rgba(255,255,255,.23),rgba(210,220,235,.08) 43%,transparent 75%); filter: blur(14px); }
+    #scene { position: absolute; inset: 0; z-index: 1; mask-image: radial-gradient(circle at center,#000 50%,transparent 68%); -webkit-mask-image: radial-gradient(circle at center,#000 50%,transparent 68%); }
+    #status { position: absolute; right: 16px; bottom: 12px; z-index: 2; max-width: 80%; color: #a1a1aa; font-size: 10px; letter-spacing: .12em; text-align: right; text-transform: uppercase; }
+    @media (max-width: 760px) { .hero { min-height: 100vh; padding-top: 118px; grid-template-columns: 1fr; gap: 4px; text-align: center; } .copy { display: flex; flex-direction: column; align-items: center; } .visual { width: min(88vw, 400px); } p { font-size: 14px; } .actions { justify-content: center; } }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@19.0.1",
+        "react/jsx-runtime": "https://esm.sh/react@19.0.1/jsx-runtime",
+        "react-dom": "https://esm.sh/react-dom@19.0.1?external=react",
+        "react-dom/client": "https://esm.sh/react-dom@19.0.1/client?external=react",
+        "three": "https://esm.sh/three@0.180.0",
+        "@react-three/fiber": "https://esm.sh/@react-three/fiber@9.4.0?external=react,react-dom,three",
+        "@react-three/drei": "https://esm.sh/@react-three/drei@10.7.6?external=react,react-dom,three,@react-three/fiber"
+      }
+    }
+  </script>
+</head>
+<body>
+  <main class="hero">
+    <section class="copy">
+      <div class="eyebrow">AI Brand Governance &nbsp;·&nbsp; Identity Systems &nbsp;·&nbsp; Real-Time Compliance</div>
+      <h1>Your Brand.<br />Never Off-Brand.</h1>
+      <p>AI-powered brand governance that keeps every message, asset and campaign aligned with your identity.</p>
+      <div class="actions"><span>Explore Blackship &nbsp; →</span><span>See How It Works &nbsp; →</span></div>
+    </section>
+    <div class="visual"><div id="scene"></div><div id="status">Loading 3D modules…</div></div>
+  </main>
+  <script type="module">
+    import React, { useMemo, useRef } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { Canvas, useFrame } from '@react-three/fiber';
+    import { Environment, Lightformer } from '@react-three/drei';
+    import * as THREE from 'three';
+
+    const status = document.getElementById('status');
+    window.addEventListener('error', (event) => { status.textContent = `3D load error: ${event.message}`; });
+    window.addEventListener('unhandledrejection', (event) => { status.textContent = `3D load error: ${event.reason?.message || event.reason}`; });
+    const h = React.createElement;
+    function Ring() {
+      const group = useRef(null);
+      const geometry = useMemo(() => new THREE.TorusKnotGeometry(1.04, .205, 192, 28, 2, 3), []);
+      useFrame((_, delta) => { if (group.current) group.current.rotation.y -= Math.min(delta, .05) * .42; });
+      return h('group', { ref: group, rotation: [.12, 0, .06] },
+        h('mesh', { geometry, castShadow: true, receiveShadow: true },
+          h('meshPhysicalMaterial', { color: '#e5e8ee', metalness: 1, roughness: .12, clearcoat: 1, clearcoatRoughness: .08, envMapIntensity: 1.65 })
+        )
+      );
+    }
+    function Studio() {
+      return h(Environment, { resolution: 128 },
+        h(React.Fragment, null,
+          h('color', { attach: 'background', args: ['#08090c'] }),
+          h(Lightformer, { intensity: 5, position: [0, 3, 2], scale: [5, 1.2, 1] }),
+          h(Lightformer, { intensity: 3.5, position: [-3, 0, 1], scale: [1, 4, 1] }),
+          h(Lightformer, { intensity: 4, position: [3, 0, -1], scale: [1, 3.5, 1] }),
+          h(Lightformer, { intensity: 2.5, position: [0, -3, 1], scale: [4, .8, 1] }),
+          h(Lightformer, { intensity: 1.5, position: [0, 1, -4], scale: [3, 2, 1] })
+        )
+      );
+    }
+    createRoot(document.getElementById('scene')).render(
+      h(Canvas, { camera: { position: [0, 0, 4.25], fov: 38, near: .1, far: 30 }, dpr: [1, 1.5], gl: { antialias: true, alpha: true, powerPreference: 'high-performance' }, onCreated: ({ gl }) => { gl.setClearColor('#000000', 0); gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 1.1; status.textContent = 'Live 3D · continuous vertical-axis rotation'; } },
+        h(React.Fragment, null,
+          h('ambientLight', { intensity: .12 }),
+          h(Studio),
+          h(Ring)
+        )
+      )
+    );
+  </script>
+</body>
+</html>
