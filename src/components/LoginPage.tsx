@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   createUserWithEmailAndPassword,
+  getRedirectResult,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
   signOut,
 } from 'firebase/auth';
 import { ArrowLeft, ArrowRight, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
@@ -50,6 +51,21 @@ export const LoginPage: React.FC<{ onContinueAsDemo: () => void }> = ({ onContin
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+  if (!auth) return;
+
+  getRedirectResult(auth)
+    .then((result) => {
+      if (result?.user) {
+        window.location.assign('/app');
+      }
+    })
+    .catch((authError) => {
+      setError(authErrorMessage(authError));
+      setBusy(false);
+    });
+  }, []);
 
   const changeMode = (nextMode: AuthMode) => {
     setMode(nextMode);
@@ -103,8 +119,7 @@ export const LoginPage: React.FC<{ onContinueAsDemo: () => void }> = ({ onContin
 
     setBusy(true);
     try {
-      await signInWithPopup(auth, googleProvider);
-      window.location.assign('/app');
+      await signInWithRedirect(auth, googleProvider);
     } catch (authError) {
       setError(authErrorMessage(authError));
     } finally {
