@@ -68,8 +68,12 @@ Return ONLY valid JSON in this exact structure:
       "recommendation": "Specific recommendation"
     }}
   ],
-  "summary": "Short overall explanation"
+  "summary": "Short overall explanation",
+  "suggestedCopy": "A complete rewritten version of the entire supplied content"
 }}
+
+
+For suggestedCopy, rewrite the complete content so the user can apply it directly. Keep the original intent and verifiable facts, address every finding, match the existing brand tone, and do not add unsupported claims. If no meaningful changes are needed, return the original content unchanged.
 
 Rules:
 - Set passed to false if meaningful brand-governance issues are found.

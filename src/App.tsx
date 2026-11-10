@@ -9,6 +9,7 @@ import { AboutSection } from './components/AboutSection';
 import { CtaSection } from './components/CtaSection';
 import { Footer } from './components/Footer';
 import { WorkspaceApp } from './components/WorkspaceApp';
+import { AppOpening } from './components/AppOpening';
 import { LoginPage } from './components/LoginPage';
 import { auth, isFirebaseConfigured } from './utils/firebase';
 
@@ -19,6 +20,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [demoSession, setDemoSession] = useState(() => window.sessionStorage.getItem(DEMO_SESSION_KEY) === 'active');
   const [authReady, setAuthReady] = useState(!auth);
+  const [showAppOpening, setShowAppOpening] = useState(() => window.location.pathname === '/app');
 
   useEffect(() => {
     if (!auth) {
@@ -39,8 +41,14 @@ export default function App() {
   }, [path, authReady, user, demoSession]);
 
   if (path === '/app') {
-    if (demoSession) return <WorkspaceApp user={{ uid: 'demo', email: 'Demo workspace', displayName: 'Demo' }} demo />;
-    if (authReady && user && isFirebaseConfigured) return <WorkspaceApp user={user} />;
+    if (demoSession) return <>
+      <WorkspaceApp user={{ uid: 'demo', email: 'Demo workspace', displayName: 'Demo' }} demo />
+      {showAppOpening && <AppOpening onComplete={() => setShowAppOpening(false)} />}
+    </>;
+    if (authReady && user && isFirebaseConfigured) return <>
+      <WorkspaceApp user={user} />
+      {showAppOpening && <AppOpening onComplete={() => setShowAppOpening(false)} />}
+    </>;
     return <main className="grid min-h-screen place-items-center bg-[#060608] text-sm text-zinc-400">Checking your BLACKSHIP sign-in…</main>;
   }
   if (window.location.pathname === '/login') return <LoginPage onContinueAsDemo={() => {

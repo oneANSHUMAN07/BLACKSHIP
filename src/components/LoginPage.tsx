@@ -1,3 +1,4 @@
+import { onAuthStateChanged } from 'firebase/auth';
 import React, { useEffect, useState } from 'react';
 import {
   createUserWithEmailAndPassword,
@@ -5,7 +6,7 @@ import {
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
-  signInWithRedirect,
+      signInWithPopup,
   signOut,
 } from 'firebase/auth';
 import { ArrowLeft, ArrowRight, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
@@ -55,16 +56,24 @@ export const LoginPage: React.FC<{ onContinueAsDemo: () => void }> = ({ onContin
   useEffect(() => {
   if (!auth) return;
 
-  getRedirectResult(auth)
-    .then((result) => {
-      if (result?.user) {
-        window.location.assign('/app');
-      }
-    })
-    .catch((authError) => {
-      setError(authErrorMessage(authError));
-      setBusy(false);
-    });
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    if (user) {
+      window.location.assign('/app');
+    }
+  });
+
+  return () => unsubscribe();
+  }, []);
+  useEffect(() => {
+    if (!auth || !isFirebaseConfigured) return;
+
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) window.location.assign('/app');
+      })
+      .catch((redirectError) => {
+        setError(authErrorMessage(redirectError));
+      });
   }, []);
 
   const changeMode = (nextMode: AuthMode) => {
@@ -119,7 +128,8 @@ export const LoginPage: React.FC<{ onContinueAsDemo: () => void }> = ({ onContin
 
     setBusy(true);
     try {
-      await signInWithRedirect(auth, googleProvider);
+      const credential = await signInWithPopup(auth, googleProvider);
+      if (credential.user) window.location.assign('/app');
     } catch (authError) {
       setError(authErrorMessage(authError));
     } finally {

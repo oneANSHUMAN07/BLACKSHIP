@@ -440,14 +440,18 @@ export function auditBrandCopy(
     for (const match of matches) {
       const start = match.index ?? 0;
 
-      const isCapitalized =
+      const isUpperCase =
         match[0] === match[0].toUpperCase() &&
         match[0] !== match[0].toLowerCase();
+      const startsWithUpperCase =
+        match[0].charAt(0) === match[0].charAt(0).toUpperCase() &&
+        match[0].charAt(0) !== match[0].charAt(0).toLowerCase();
 
-      const value = isCapitalized
-        ? rem.replacement.charAt(0).toUpperCase() +
-          rem.replacement.slice(1)
-        : rem.replacement;
+      const value = isUpperCase
+        ? rem.replacement.toLocaleUpperCase()
+        : startsWithUpperCase
+          ? rem.replacement.charAt(0).toLocaleUpperCase() + rem.replacement.slice(1)
+          : rem.replacement;
 
       replacements.push({
         start,
@@ -463,7 +467,7 @@ export function auditBrandCopy(
    */
   const factSensitivePatterns: RegExp[] = [
     /\b(?:world'?s|industry'?s)\s+(?:#\s?1|number\s+one|best|leading|fastest)\b/gi,
-    /#\s?1\b/gi,
+    /(?<![\w])(?:the\s+)?#\s?1(?:\s+(?:fastest|platform)){0,2}/gi,
     /\b\d+(?:\.\d+)?\s?%\s?(?:accurate|compliant|compliance|uptime|faster|reduction|increase|success|conversion)\b/gi,
   ];
 

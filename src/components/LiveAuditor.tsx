@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { auditBrandCopy, loadBrandProfile, saveBrandProfile, type AuditResult, type BrandProfile, type CustomBrandRule } from '../utils/governance';
-import type { ReviewDecision, WorkspaceAuditRecord } from '../utils/workspace';
+import {
+  applyDecisionMemory,
+  findRelevantDecision,
+  type ReviewDecision,
+  type WorkspaceAuditRecord,
+} from '../utils/workspace';
 import { ShieldCheck, CheckCircle, ArrowRight, Plus, Trash2, Download } from 'lucide-react';
 
 const PRESET_SNIPPETS = [
@@ -125,6 +130,7 @@ function mapAdaptionResult(payload: AdaptionAuditPayload, draft: string): AuditR
 }
 
 interface LiveAuditorProps {
+  auditHistory?: WorkspaceAuditRecord[];
   workspaceMode?: boolean;
   showExportReport?: boolean;
   initialDraft?: string;
@@ -147,8 +153,8 @@ function loadApprovalHistory(): ApprovalRecord[] {
   }
 }
 
-export const LiveAuditor: React.FC<LiveAuditorProps> = ({ workspaceMode = false, showExportReport = false, initialDraft, initialAuditId, initialAuditRecord, initialProfile, onProfileSave, onAuditComplete, onDecision, onCorrectionUpdate }) => {
-  const [inputText, setInputText] = useState(initialDraft ?? PRESET_SNIPPETS[0].text);
+export const LiveAuditor: React.FC<LiveAuditorProps> = ({ workspaceMode = false, showExportReport = false, initialDraft, initialAuditId, initialAuditRecord, initialProfile,auditHistory = [], onProfileSave, onAuditComplete, onDecision, onCorrectionUpdate }) => {
+    const [inputText, setInputText] = useState(initialDraft ?? '');
   const [brandProfile, setBrandProfile] = useState<BrandProfile>(() => initialProfile ?? loadBrandProfile());
   const [saveMessage, setSaveMessage] = useState('');
   const [approvalHistory, setApprovalHistory] = useState<ApprovalRecord[]>(() => workspaceMode ? [] : loadApprovalHistory());
@@ -163,7 +169,25 @@ export const LiveAuditor: React.FC<LiveAuditorProps> = ({ workspaceMode = false,
   const [aiAuditResult, setAiAuditResult] = useState<AuditResult | null>(null);
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditError, setAuditError] = useState('');
-  const auditResult = aiAuditResult ?? localAuditResult; 
+const priorDecision = workspaceMode
+  ? findRelevantDecision(inputText, auditHistory)
+  : undefined;
+
+const baseAuditResult =
+  initialAuditId && initialAuditRecord
+    ? {
+        score: initialAuditRecord.score,
+        status: initialAuditRecord.status,
+        violations: initialAuditRecord.violations,
+        suggestedCopy: initialAuditRecord.suggestedCopy,
+      }
+    : aiAuditResult ?? localAuditResult;
+
+const auditResult =
+  initialAuditId && initialAuditRecord
+    ? baseAuditResult
+    : applyDecisionMemory(baseAuditResult, priorDecision);
+const isEmptyDraft = !inputText.trim() && !hasRunAudit;
   const policySnapshot = JSON.stringify(brandProfile);
   const serverApproval = initialAuditRecord?.decision ? {
     id: initialAuditRecord.id,
@@ -198,10 +222,13 @@ const handleRunAudit = async () => {
   setAuditError('');
   setCorrectionIgnored(false);
   setCurrentApprovalId(null);
+  const controller = new AbortController();
+  const requestTimeout = window.setTimeout(() => controller.abort(), 15000);
 
   try {
     const response = await fetch('http://127.0.0.1:8000/api/audit', {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -250,9 +277,11 @@ const handleRunAudit = async () => {
     );
 
     setAuditError(
-      error instanceof Error
-        ? error.message
-        : 'Unable to connect to BLACKSHIP AI audit server.'
+      error instanceof DOMException && error.name === 'AbortError'
+        ? 'Adaption took too long to respond. The local rule audit was used instead.'
+        : error instanceof Error
+          ? error.message
+          : 'Unable to connect to BLACKSHIP AI audit server.'
     );
 
     // ONLY fallback if the actual AI request failed.
@@ -278,6 +307,7 @@ const handleRunAudit = async () => {
       setActiveAuditId(null);
     }
   } finally {
+    window.clearTimeout(requestTimeout);
     setIsAuditing(false);
   }
 };
@@ -495,7 +525,7 @@ const updateCustomRule = <K extends keyof CustomBrandRule,>(index: number, field
               value={inputText}
               onChange={(e) => handleDraftChange(e.target.value)}
               rows={4}
-              placeholder="Paste copy here to evaluate brand compliance..."
+                        placeholder={PRESET_SNIPPETS[0].text}
               className="w-full bg-black/60 border border-white/10 rounded-lg p-4 text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-white/40 font-sans text-sm sm:text-base leading-relaxed transition-colors resize-none"
             />
 
@@ -511,7 +541,20 @@ const updateCustomRule = <K extends keyof CustomBrandRule,>(index: number, field
   </div>
 )}
 <span className="text-xs text-zinc-500">{hasRunAudit ? 'This draft is recorded in the audit history.' : 'Run the audit to record this draft and enable reviewer decisions.'}</span></div>}
-
+{priorDecision && (
+  <div className="mb-4 rounded-lg border border-sky-300/20 bg-sky-300/[0.04] p-4">
+    <p className="text-[10px] font-semibold uppercase tracking-widest text-sky-300">
+      Similar prior review · {priorDecision.decision?.replace('_', ' ')}
+    </p>
+    <p className="mt-2 text-xs text-zinc-300">
+      {priorDecision.reviewerNote ||
+        'A reviewer decision was recorded for similar content.'}
+    </p>
+    <p className="mt-2 text-[10px] text-zinc-500">
+      The audit score and suggested copy include this review context.
+    </p>
+  </div>
+)}
             {/* Smart Corrections */}
             <div className="mt-6 pt-5 border-t border-white/10">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
@@ -521,7 +564,9 @@ const updateCustomRule = <K extends keyof CustomBrandRule,>(index: number, field
                 </span>
                 {auditResult.violations.length > 0 && <span className="text-[10px] uppercase tracking-wider text-zinc-500">{correctionIgnored ? 'Correction ignored' : 'Review before applying'}</span>}
               </div>
-              {auditResult.violations.length === 0 ? (
+              {isEmptyDraft ? (
+                <div className="p-3.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-zinc-400">Add content above to see suggested corrections.</div>
+              ) : auditResult.violations.length === 0 ? (
                 <div className="p-3.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-zinc-300">No correction is needed. The draft currently satisfies the configured rules.</div>
               ) : (
                 <>
@@ -562,14 +607,16 @@ const updateCustomRule = <K extends keyof CustomBrandRule,>(index: number, field
               </span>
               <span
                 className={`text-xs font-mono uppercase font-bold tracking-widest px-2.5 py-0.5 rounded border ${
-                  auditResult.status === 'passed'
+                  isEmptyDraft
+                    ? 'border-white/10 text-zinc-500 bg-transparent'
+                    : auditResult.status === 'passed'
                     ? 'border-white/30 text-white bg-white/10'
                     : auditResult.status === 'warning'
                     ? 'border-zinc-400/30 text-zinc-300 bg-white/5'
                     : 'border-zinc-500/40 text-zinc-300 bg-zinc-900'
                 }`}
               >
-                {auditResult.status.toUpperCase()}
+                {isEmptyDraft ? 'READY' : auditResult.status.toUpperCase()}
               </span>
             </div>
 
@@ -580,7 +627,7 @@ const updateCustomRule = <K extends keyof CustomBrandRule,>(index: number, field
                   Rule Engine Score
                 </span>
                 <span className="text-3xl font-editorial font-bold text-white tracking-tight">
-                  {auditResult.score} / 100
+                  {isEmptyDraft ? '—' : `${auditResult.score} / 100`}
                 </span>
               </div>
               <div className="text-right">
@@ -588,7 +635,7 @@ const updateCustomRule = <K extends keyof CustomBrandRule,>(index: number, field
                   Violations Detected
                 </span>
                 <span className="text-xl font-mono font-bold text-white">
-                  {auditResult.violations.length}
+                  {isEmptyDraft ? '—' : auditResult.violations.length}
                 </span>
               </div>
             </div>
@@ -610,8 +657,8 @@ const updateCustomRule = <K extends keyof CustomBrandRule,>(index: number, field
                 <button type="button" onClick={() => handleHumanDecision('rejected')} disabled={!inputText.trim() || !reviewerNote.trim() || (workspaceMode && !hasRunAudit)} className="min-h-11 rounded border border-white/20 px-4 text-xs font-bold uppercase tracking-widest text-zinc-300 transition-colors hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">Reject</button>
               </div>
               {showExportReport && <button type="button" onClick={handleExportReport} disabled={!inputText.trim() || (workspaceMode && !hasRunAudit)} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded border border-white/15 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-white/35 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><Download className="h-4 w-4" /> Download audit report</button>}
-              {currentApproval && <p role="status" className="mt-3 text-xs text-zinc-400">Decision saved on this device · {new Date(currentApproval.approvedAt).toLocaleString()}{currentApproval.reviewerNote ? ` · ${currentApproval.reviewerNote}` : ''}</p>}
-              {!currentApproval && <p className="mt-3 text-xs text-zinc-500">Review decisions are saved in this browser with the current copy, score, and policy hits.</p>}
+              {currentApproval && <p role="status" className="mt-3 text-xs text-zinc-400">{workspaceMode ? 'Decision saved to this audit' : 'Decision saved on this device'} · {new Date(currentApproval.approvedAt).toLocaleString()}{currentApproval.reviewerNote ? ` · ${currentApproval.reviewerNote}` : ''}</p>}
+              {!currentApproval && <p className="mt-3 text-xs text-zinc-500">Review decisions are saved with the audit record.</p>}
             </div>
 
             <div id="review-history" className="mb-6">
@@ -637,7 +684,9 @@ const updateCustomRule = <K extends keyof CustomBrandRule,>(index: number, field
                 Active Policy Hits:
               </span>
 
-              {auditResult.violations.length === 0 ? (
+              {isEmptyDraft ? (
+                <div className="p-4 rounded-lg border border-white/10 bg-white/[0.02] text-xs text-zinc-400">Add content above to check it against your Brand DNA.</div>
+              ) : auditResult.violations.length === 0 ? (
                 <div className="p-4 rounded-lg border border-white/15 bg-white/[0.03] text-xs text-zinc-300 flex items-center gap-3">
                   <ShieldCheck className="w-5 h-5 text-white shrink-0" />
                   <span>

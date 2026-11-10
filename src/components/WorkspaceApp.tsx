@@ -1,14 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { signOut, type User } from 'firebase/auth';
-import { Activity, ArrowDownToLine, ArrowLeft, Clock3, FileSearch, LayoutDashboard, Settings2, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { Activity, ArrowDownToLine, ArrowLeft, Bell, CheckCheck, Clock3, FileSearch, LayoutDashboard, Mail, Settings2, ShieldCheck, SlidersHorizontal, UserRound } from 'lucide-react';
 import { BrandDnaPanel } from './BrandDnaPanel';
 import { LiveAuditor } from './LiveAuditor';
 import { auditBrandCopy, DEFAULT_BRAND_PROFILE, loadBrandProfile, saveBrandProfile, type AuditResult, type BrandProfile } from '../utils/governance';
-import { createWorkspaceAudit, getHistoricalViolations, loadWorkspaceAudits, saveWorkspaceAudits, textSimilarity, type ReviewDecision, type WorkspaceAuditRecord } from '../utils/workspace';
+import {
+  applyDecisionMemory,
+  createWorkspaceAudit,
+  findRelevantDecision,
+  getHistoricalViolations,
+  loadWorkspaceAudits,
+  saveWorkspaceAudits,
+  textSimilarity,
+  type ReviewDecision,
+  type WorkspaceAuditRecord,
+} from '../utils/workspace';
 import { saveAuditToCloud, saveBrandToCloud, subscribeToCloudWorkspace } from '../utils/cloudWorkspace';
 import { auth } from '../utils/firebase';
 
-type WorkspacePage = 'overview' | 'brand-dna' | 'auditor' | 'review-queue' | 'brand-memory' | 'reports' | 'settings';
+type WorkspacePage = 'overview' | 'brand-dna' | 'auditor' | 'review-queue' | 'brand-memory' | 'reports' | 'audit-history' | 'account' | 'notifications' | 'settings';
 
 const NAV_ITEMS: { id: WorkspacePage; label: string; icon: React.FC<{ className?: string }> }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -17,6 +27,10 @@ const NAV_ITEMS: { id: WorkspacePage; label: string; icon: React.FC<{ className?
   { id: 'review-queue', label: 'Review Queue', icon: Clock3 },
   { id: 'brand-memory', label: 'Brand Memory', icon: ShieldCheck },
   { id: 'reports', label: 'Reports', icon: Activity },
+
+      { id: 'audit-history', label: 'Audit History', icon: Clock3 },
+  { id: 'account', label: 'My Account', icon: UserRound },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'settings', label: 'Settings', icon: Settings2 },
 ];
 
@@ -26,7 +40,16 @@ const greeting = () => {
   return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 };
 
-type WorkspaceIdentity = Pick<User, 'uid' | 'email' | 'displayName'>;
+type WorkspaceIdentity = Pick<User, 'uid' | 'email' | 'displayName'>
+  & Partial<Pick<User, 'photoURL' | 'providerData' | 'metadata'>>;
+
+type WorkspaceNotification = {
+  id: string;
+  audit: WorkspaceAuditRecord;
+  at: string;
+  title: string;
+  detail: string;
+};
 
 export const WorkspaceApp: React.FC<{ user: WorkspaceIdentity; demo?: boolean }> = ({ user, demo = false }) => {
   const [page, setPage] = useState<WorkspacePage>('overview');
@@ -49,6 +72,7 @@ export const WorkspaceApp: React.FC<{ user: WorkspaceIdentity; demo?: boolean }>
         originalScore: audit.originalScore ?? audit.score,
         originalStatus: audit.originalStatus ?? audit.status,
         originalViolations: audit.originalViolations ?? audit.violations,
+        originalSuggestedCopy: audit.originalSuggestedCopy ?? audit.suggestedCopy,
         draft: correctedCopy,
         score: result.score,
         status: result.status,
@@ -61,6 +85,22 @@ export const WorkspaceApp: React.FC<{ user: WorkspaceIdentity; demo?: boolean }>
   });
   const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null);
   const [toast, setToast] = useState('');
+  const notificationReadKey = `blackship.notifications.read.v1.${user.uid}`;
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => {
+    try {
+      const saved = window.localStorage.getItem(notificationReadKey);
+      return saved ? JSON.parse(saved) as string[] : [];
+    } catch {
+      return [];
+    }
+  });
+  const [notificationBaselineReady, setNotificationBaselineReady] = useState(() => {
+    try {
+      return Boolean(window.localStorage.getItem(notificationReadKey)) || demo;
+    } catch {
+      return demo;
+    }
+  });
 
   useEffect(() => {
     if (demo) {
@@ -123,19 +163,84 @@ export const WorkspaceApp: React.FC<{ user: WorkspaceIdentity; demo?: boolean }>
     return counts;
   }, {}), [audits]);
   const topViolationTypes = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1]);
+  const greetingName = user.displayName?.trim().split(/\s+/)[0]
+    || user.email?.split('@')[0]
+    || 'there';
+  const notifications = audits.flatMap<WorkspaceNotification>((audit) => {
+    const items: WorkspaceNotification[] = [{
+      id: `${audit.id}:audit`, audit, at: audit.auditedAt,
+      title: 'Audit completed', detail: `${audit.title} · score ${audit.score}/100`,
+    }];
+    if (audit.correctionStatus && audit.correctionStatus !== 'ignored') {
+      items.push({
+        id: `${audit.id}:correction:${audit.correctionStatus}`, audit, at: audit.auditedAt,
+        title: 'Correction applied', detail: `${audit.title} · ${audit.correctionStatus}`,
+      });
+    }
+    if (audit.decision && audit.decidedAt) {
+      items.push({
+        id: `${audit.id}:decision:${audit.decidedAt}`, audit, at: audit.decidedAt,
+        title: `Review ${audit.decision.replace('_', ' ')}`,
+        detail: audit.reviewerNote || audit.title,
+      });
+    }
+    return items;
+  }).sort((left, right) => right.at.localeCompare(left.at)).slice(0, 50);
 
-  const handleAuditComplete = (draft: string, profile: BrandProfile, result: AuditResult) => {
-    const record = createWorkspaceAudit(draft, profile, result);
-    const next = [record, ...audits].slice(0, 100);
-    setBrand(profile);
-    setAudits(next);
-    setSelectedAuditId(record.id);
-    saveBrandProfile(profile, user.uid);
-    saveWorkspaceAudits(next, user.uid);
-    saveBrandEverywhere(profile);
-    saveAuditEverywhere(record);
-    setToast('Audit saved in this browser.');
-    return record.id;
+  useEffect(() => {
+    if (notificationBaselineReady || (!demo && cloudSyncStatus !== 'synced')) return;
+    const initialReadIds = notifications.map((notification) => notification.id);
+    setReadNotificationIds(initialReadIds);
+    setNotificationBaselineReady(true);
+    try {
+      window.localStorage.setItem(notificationReadKey, JSON.stringify(initialReadIds));
+    } catch {
+      // Keep the notification list available if browser storage is unavailable.
+    }
+  }, [notificationBaselineReady, notifications, notificationReadKey, cloudSyncStatus, demo]);
+
+  const unreadNotificationCount = notificationBaselineReady
+    ? notifications.filter((notification) => !readNotificationIds.includes(notification.id)).length
+    : 0;
+  const markNotificationsRead = (ids: string[]) => {
+    const next = [...new Set([...readNotificationIds, ...ids])];
+    setReadNotificationIds(next);
+    try {
+      window.localStorage.setItem(notificationReadKey, JSON.stringify(next));
+    } catch {
+      setToast('Notifications are visible, but read status could not be saved on this device.');
+    }
+  };
+
+  const handleAuditComplete = (
+  draft: string,
+  profile: BrandProfile,
+  result: AuditResult
+  ) => {
+  const priorDecision = findRelevantDecision(draft, audits);
+  const record = createWorkspaceAudit(draft, profile, result);
+
+  if (priorDecision) {
+    record.relatedDecisionId = priorDecision.id;
+    record.reviewerNote = priorDecision.reviewerNote;
+  }
+
+  const next = [record, ...audits].slice(0, 100);
+  setBrand(profile);
+  setAudits(next);
+  setSelectedAuditId(record.id);
+  saveBrandProfile(profile, user.uid);
+  saveWorkspaceAudits(next, user.uid);
+  saveBrandEverywhere(profile);
+  saveAuditEverywhere(record);
+
+  setToast(
+    priorDecision
+      ? `Audit saved with context from a similar ${priorDecision.decision?.replace('_', ' ')} decision.`
+      : 'Audit saved in this browser.'
+  );
+
+  return record.id;
   };
 
   const handleCorrectionUpdate = (auditId: string | null, correction: string, result: AuditResult, status: 'applied' | 'edited' | 'ignored') => {
@@ -181,7 +286,7 @@ export const WorkspaceApp: React.FC<{ user: WorkspaceIdentity; demo?: boolean }>
     saveWorkspaceAudits(next, user.uid);
     const updatedAudit = next.find((audit) => audit.id === auditId);
     if (updatedAudit) saveAuditEverywhere(updatedAudit);
-    setToast('Reviewer decision saved in this browser.');
+    setToast('Reviewer decision recorded.');
   };
 
   const handleSaveBrand = async (profile: BrandProfile) => {
@@ -261,6 +366,8 @@ export const WorkspaceApp: React.FC<{ user: WorkspaceIdentity; demo?: boolean }>
           </a>
           <div className="hidden max-w-[240px] truncate text-[10px] uppercase tracking-[0.14em] text-zinc-500 sm:block"><span className={`mr-2 inline-block h-1.5 w-1.5 rounded-full ${demo ? 'bg-amber-300' : 'bg-emerald-400'}`} />{demo ? 'Demo workspace' : user.email ?? user.displayName ?? 'Authenticated account'}</div>
           <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setPage('notifications')} aria-label={`Notifications${unreadNotificationCount ? `, ${unreadNotificationCount} unread` : ''}`} className={`relative inline-flex min-h-10 items-center gap-2 rounded border px-3 text-[10px] font-semibold uppercase tracking-wider transition-colors ${page === 'notifications' ? 'border-white/35 text-white' : 'border-white/15 text-zinc-300 hover:border-white/35 hover:text-white'}`}><Bell className="h-3.5 w-3.5" /><span className="hidden sm:inline">Notifications</span>{unreadNotificationCount > 0 && <span className="rounded-full bg-sky-300 px-1.5 py-0.5 text-[9px] font-bold text-black">{unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}</span>}</button>
+            <button type="button" onClick={() => setPage('account')} aria-label="My account" className={`inline-flex min-h-10 items-center gap-2 rounded border px-3 text-[10px] font-semibold uppercase tracking-wider transition-colors ${page === 'account' ? 'border-white/35 text-white' : 'border-white/15 text-zinc-300 hover:border-white/35 hover:text-white'}`}><UserRound className="h-3.5 w-3.5" /><span className="hidden sm:inline">My Account</span></button>
             <button type="button" onClick={handleSignOut} className="inline-flex min-h-10 items-center rounded border border-white/15 px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-white/35 hover:text-white">{demo ? 'Exit demo' : 'Sign out'}</button>
             <a href="/" className="inline-flex min-h-10 items-center gap-2 rounded border border-white/15 px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-white/35 hover:text-white"><ArrowLeft className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Marketing site</span><span className="sm:hidden">Back</span></a>
           </div>
@@ -292,7 +399,7 @@ export const WorkspaceApp: React.FC<{ user: WorkspaceIdentity; demo?: boolean }>
         <main className="min-w-0">
           {page === 'overview' && <section className="mx-auto max-w-6xl px-5 py-9 sm:px-8 lg:py-12">
             <div className="mb-8 flex flex-wrap items-end justify-between gap-5">
-              <div><p className="mb-2 text-[10px] uppercase tracking-[0.23em] text-sky-300">Brand governance control center</p><h1 className="font-editorial text-3xl font-black uppercase tracking-tight text-white sm:text-5xl">{greeting()}, BLACKSHIP</h1><p className="mt-3 text-sm text-zinc-400">Run an audit, review policy findings, and record a human decision.</p></div>
+              <div><p className="mb-2 text-[10px] uppercase tracking-[0.23em] text-sky-300">Brand governance control center</p><h1 className="font-editorial text-3xl font-black uppercase tracking-tight text-white sm:text-5xl">{greeting()}, {greetingName}</h1><p className="mt-3 text-sm text-zinc-400">Run an audit, review policy findings, and record a human decision.</p></div>
               <button type="button" onClick={() => { setSelectedAuditId(null); setPage('auditor'); }} className="inline-flex min-h-12 items-center gap-2 rounded bg-white px-5 text-xs font-bold uppercase tracking-widest text-black transition-colors hover:bg-zinc-200"><FileSearch className="h-4 w-4" /> New content audit</button>
             </div>
 
@@ -314,8 +421,84 @@ export const WorkspaceApp: React.FC<{ user: WorkspaceIdentity; demo?: boolean }>
 
           {page === 'brand-dna' && <BrandDnaPanel initialProfile={brand} onSaved={handleSaveBrand} />}
 
-          {page === 'auditor' && <LiveAuditor key={selectedAuditId ?? 'new-audit'} workspaceMode showExportReport initialDraft={selectedAudit?.draft} initialAuditId={selectedAuditId ?? undefined} initialAuditRecord={selectedAudit} initialProfile={brand} onProfileSave={handleSaveBrand} onAuditComplete={handleAuditComplete} onDecision={handleDecision} onCorrectionUpdate={handleCorrectionUpdate} />}
+{page === 'auditor' && (
+  <LiveAuditor
+    key={selectedAuditId ?? 'new-audit'}
+    workspaceMode
+    showExportReport
+    initialDraft={selectedAudit?.draft}
+    initialAuditId={selectedAuditId ?? undefined}
+    initialAuditRecord={selectedAudit}
+    initialProfile={brand}
+    auditHistory={audits}
+    onProfileSave={handleSaveBrand}
+    onAuditComplete={handleAuditComplete}
+    onDecision={handleDecision}
+    onCorrectionUpdate={handleCorrectionUpdate}
+  />
+)}
 
+      {page === 'audit-history' && (
+        <section className="mx-auto max-w-6xl px-5 py-10">
+          <h1 className="text-3xl font-bold text-white">Audit History</h1>
+          <p className="mt-2 text-sm text-zinc-400">Previous checks, detected issues, AI corrections, and reviewer decisions.</p>
+          <p className="mt-2 text-xs text-zinc-500">{audits.length} saved audits</p>
+          {audits.length === 0 ? <div className="mt-7 rounded-xl border border-dashed border-white/15 p-8 text-sm text-zinc-400">No audits saved yet. Run a brand audit to start your history.</div> : (
+            <div className="mt-7 space-y-4">
+              {audits.map((audit) => (
+                <article key={audit.id} className="rounded-2xl border border-white/10 bg-[#0b0c10] p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div><p className="text-[10px] uppercase tracking-widest text-zinc-500">{new Date(audit.auditedAt).toLocaleString()}</p><h2 className="mt-2 text-lg font-semibold text-white">{audit.title}</h2><p className="mt-1 text-xs text-zinc-400">{audit.brandName} · Score {audit.score}/100 · {audit.violations.length} issue(s)</p></div>
+                    <div className="flex items-center gap-3"><span className="rounded-full border border-white/10 px-3 py-1.5 text-xs capitalize text-zinc-300">{audit.decision ? audit.decision.replace('_', ' ') : 'Pending review'}</span><button type="button" onClick={() => openAudit(audit)} className="rounded-lg border border-white/15 px-3 py-2 text-xs font-semibold text-white hover:bg-white/5">Open audit</button></div>
+                  </div>
+                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                    <div className="rounded-xl border border-white/10 p-4"><h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Content checked</h3><p className="mt-2 whitespace-pre-wrap text-sm text-zinc-200">{audit.originalDraft || audit.draft}</p></div>
+                    <div className="rounded-xl border border-white/10 p-4"><h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">AI suggested correction</h3><p className="mt-2 whitespace-pre-wrap text-sm text-zinc-200">{audit.originalSuggestedCopy || audit.suggestedCopy || 'No AI suggestion was recorded.'}</p></div>
+                  </div>
+                  <div className="mt-3 rounded-xl border border-white/10 p-4"><h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Problems detected</h3>{(audit.originalViolations ?? audit.violations).length ? <div className="mt-3 space-y-3">{(audit.originalViolations ?? audit.violations).map((violation, index) => <div key={`${audit.id}-issue-${index}`} className="border-l-2 border-amber-400/60 pl-3"><p className="text-xs font-semibold text-amber-200">{violation.category} · {violation.severity}</p><p className="mt-1 text-sm text-zinc-300">{violation.explanation}</p><p className="mt-1 text-xs text-zinc-500">Suggestion: {violation.recommendation}</p></div>)}</div> : <p className="mt-2 text-sm text-zinc-400">No policy issues were detected.</p>}</div>
+                  {audit.appliedCorrection && <div className="mt-3 rounded-xl border border-sky-300/15 p-4"><h3 className="text-xs font-semibold uppercase tracking-wider text-sky-200">Applied correction · {audit.correctionStatus || 'recorded'}</h3><p className="mt-2 whitespace-pre-wrap text-sm text-zinc-200">{audit.appliedCorrection}</p></div>}
+                  <div className="mt-3 rounded-xl border border-white/10 p-4"><h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Final decision</h3><p className="mt-2 text-sm capitalize text-white">{audit.decision ? audit.decision.replace('_', ' ') : 'Awaiting reviewer decision'}</p>{audit.reviewerNote && <p className="mt-1 text-sm text-zinc-400">Reviewer note: {audit.reviewerNote}</p>}{audit.decidedAt && <p className="mt-1 text-xs text-zinc-500">Recorded {new Date(audit.decidedAt).toLocaleString()}</p>}</div>
+                </article>
+              ))}
+            </div>
+          )}
+
+        </section>
+      )}
+
+          {page === 'account' && <section className="mx-auto max-w-5xl px-5 py-10 sm:px-8">
+            <p className="mb-3 text-[10px] uppercase tracking-[0.23em] text-sky-300">Personal workspace</p>
+            <h1 className="font-editorial text-4xl font-black uppercase text-white sm:text-5xl">My Account</h1>
+            <p className="mt-3 text-sm text-zinc-400">Your profile and the work saved to this BLACKSHIP account.</p>
+            <div className="mt-7 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+              <section className="rounded-xl border border-white/10 bg-[#0b0c10] p-5 sm:p-6">
+                <h2 className="text-xs font-bold uppercase tracking-[0.18em] text-white">Personal information</h2>
+                <div className="mt-5 flex items-center gap-4">
+                  {user.photoURL ? <img src={user.photoURL} alt="" className="h-14 w-14 rounded-full border border-white/10 object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/[0.04]"><UserRound className="h-6 w-6 text-zinc-300" /></div>}
+                  <div><p className="text-base font-semibold text-white">{user.displayName || 'BLACKSHIP user'}</p><p className="mt-1 text-xs text-zinc-400">{demo ? 'Demo workspace' : 'Signed-in account'}</p></div>
+                </div>
+                <dl className="mt-6 space-y-4">
+                  <div className="flex items-start gap-3"><Mail className="mt-0.5 h-4 w-4 text-zinc-500" /><div><dt className="text-[10px] uppercase tracking-wider text-zinc-500">Email</dt><dd className="mt-1 break-all text-sm text-zinc-200">{user.email || 'No email on this account'}</dd></div></div>
+                  <div><dt className="text-[10px] uppercase tracking-wider text-zinc-500">Sign-in method</dt><dd className="mt-1 text-sm text-zinc-200">{demo ? 'Demo' : user.providerData?.map((provider) => provider.providerId === 'google.com' ? 'Google' : provider.providerId === 'password' ? 'Email and password' : provider.providerId).join(', ') || 'Firebase account'}</dd></div>
+                  {user.metadata?.creationTime && <div><dt className="text-[10px] uppercase tracking-wider text-zinc-500">Account created</dt><dd className="mt-1 text-sm text-zinc-200">{new Date(user.metadata.creationTime).toLocaleDateString()}</dd></div>}
+                  <div><dt className="text-[10px] uppercase tracking-wider text-zinc-500">Active brand</dt><dd className="mt-1 text-sm text-zinc-200">{brand.brandName || 'Untitled brand'}</dd></div>
+                  <div><dt className="text-[10px] uppercase tracking-wider text-zinc-500">Cloud status</dt><dd className="mt-1 text-sm text-zinc-200">{demo ? 'Saved on this device' : cloudSyncStatus === 'synced' ? 'Synced to your Firebase account' : cloudSyncStatus === 'connecting' ? 'Connecting to Firebase' : 'Device copy saved · sync needs attention'}</dd></div>
+                </dl>
+              </section>
+              <section className="rounded-xl border border-white/10 bg-[#0b0c10] p-5 sm:p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xs font-bold uppercase tracking-[0.18em] text-white">Your saved work</h2><p className="mt-1 text-xs text-zinc-500">Audits, corrections, and decisions linked to this account.</p></div><button type="button" onClick={exportWorkspaceReport} disabled={!audits.length} className="inline-flex min-h-9 items-center gap-2 rounded border border-white/15 px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-200 hover:border-white/35 disabled:opacity-40"><ArrowDownToLine className="h-3.5 w-3.5" /> Export</button></div>
+                <div className="mt-5 grid grid-cols-3 gap-2"><div className="rounded-lg bg-white/[0.03] p-3"><p className="text-xl font-bold text-white">{number(audits.length)}</p><p className="mt-1 text-[9px] uppercase tracking-wider text-zinc-500">Audits</p></div><div className="rounded-lg bg-white/[0.03] p-3"><p className="text-xl font-bold text-white">{number(decidedAudits.length)}</p><p className="mt-1 text-[9px] uppercase tracking-wider text-zinc-500">Decisions</p></div><div className="rounded-lg bg-white/[0.03] p-3"><p className="text-xl font-bold text-white">{number(pendingAudits.length)}</p><p className="mt-1 text-[9px] uppercase tracking-wider text-zinc-500">Pending</p></div></div>
+                {audits.length === 0 ? <p className="mt-5 rounded-lg border border-dashed border-white/10 p-5 text-sm text-zinc-400">Your saved audits will appear here after your first content review.</p> : <div className="mt-4 divide-y divide-white/[0.07]">{audits.slice(0, 8).map((audit) => <button key={audit.id} type="button" onClick={() => openAudit(audit)} className="flex w-full items-center justify-between gap-3 py-3 text-left hover:bg-white/[0.025]"><span className="min-w-0"><span className="block truncate text-sm text-zinc-200">{audit.title}</span><span className="mt-1 block text-[10px] text-zinc-500">{new Date(audit.auditedAt).toLocaleString()} · score {audit.score}</span></span><span className="shrink-0 text-[10px] font-semibold uppercase text-zinc-400">{audit.decision?.replace('_', ' ') || 'Pending'}</span></button>)}</div>}
+                {audits.length > 8 && <button type="button" onClick={() => setPage('audit-history')} className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-sky-300 hover:text-white">View all {audits.length} saved audits →</button>}
+              </section>
+            </div>
+          </section>}
+
+          {page === 'notifications' && <section className="mx-auto max-w-5xl px-5 py-10 sm:px-8">
+            <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="mb-3 text-[10px] uppercase tracking-[0.23em] text-sky-300">Workspace activity</p><h1 className="font-editorial text-4xl font-black uppercase text-white sm:text-5xl">Notifications</h1><p className="mt-3 text-sm text-zinc-400">Audit, correction, and reviewer activity for your account.</p></div>{unreadNotificationCount > 0 && <button type="button" onClick={() => markNotificationsRead(notifications.map((notification) => notification.id))} className="inline-flex min-h-10 items-center gap-2 rounded border border-white/15 px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-200 hover:border-white/35"><CheckCheck className="h-4 w-4" /> Mark all read</button>}</div>
+            {notifications.length === 0 ? <div className="mt-7 rounded-xl border border-dashed border-white/15 p-8 text-center"><Bell className="mx-auto h-6 w-6 text-zinc-500" /><p className="mt-3 text-sm text-zinc-300">You’re all caught up</p><p className="mt-1 text-xs text-zinc-500">New audit and review activity will appear here.</p></div> : <div className="mt-7 space-y-2">{notifications.map((notification) => { const unread = notificationBaselineReady && !readNotificationIds.includes(notification.id); return <button key={notification.id} type="button" onClick={() => { markNotificationsRead([notification.id]); openAudit(notification.audit); }} className="flex w-full items-start gap-3 rounded-xl border border-white/10 bg-[#0b0c10] p-4 text-left transition hover:border-white/25"><span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${unread ? 'bg-sky-300' : 'bg-zinc-700'}`} /><span className="min-w-0 flex-1"><span className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-semibold text-white">{notification.title}</span><time className="text-[10px] text-zinc-500">{new Date(notification.at).toLocaleString()}</time></span><span className="mt-1 block truncate text-xs text-zinc-400">{notification.detail}</span></span></button>; })}</div>}
+            <p className="mt-4 text-[10px] text-zinc-600">Read status is saved on this device for this signed-in account.</p>
+          </section>}
           {page === 'review-queue' && <section className="mx-auto max-w-5xl px-5 py-10 sm:px-8"><p className="mb-3 text-[10px] uppercase tracking-[0.23em] text-sky-300">Human review</p><h1 className="font-editorial text-4xl font-black uppercase text-white sm:text-5xl">Review queue</h1><p className="mt-3 text-sm text-zinc-400">Only saved audits without a final decision appear here.</p>{pendingAudits.length === 0 ? <div className="mt-8 rounded-xl border border-dashed border-white/15 bg-white/[0.02] p-8 text-center"><p className="text-sm text-zinc-300">No content awaiting review</p><p className="mt-2 text-xs text-zinc-500">Run an audit to add a draft to the queue.</p></div> : <div className="mt-6 space-y-3">{pendingAudits.map((audit) => <article key={audit.id} className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/10 bg-[#0b0c10] p-5"><div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{audit.title}</p><p className="mt-1 text-xs text-zinc-500">{new Date(audit.auditedAt).toLocaleString()} · {audit.violations.length} issues · score {audit.score}</p></div><button type="button" onClick={() => openAudit(audit)} className="min-h-10 rounded border border-white/20 px-4 text-[10px] font-bold uppercase tracking-wider text-white hover:bg-white/10">Open in auditor</button></article>)}</div>}</section>}
 
           {page === 'brand-memory' && <section className="mx-auto max-w-5xl px-5 py-10 sm:px-8">

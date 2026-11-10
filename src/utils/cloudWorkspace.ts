@@ -58,7 +58,7 @@ export function subscribeToCloudWorkspace(
     onUpdate(brand, audits);
   };
 
-  const unsubscribeAccount = onSnapshot(accountRef, (snapshot) => {
+  const unsubscribeAccount = onSnapshot(accountRef, { includeMetadataChanges: true }, (snapshot) => {
     if (snapshot.metadata.fromCache) return;
     accountReady = true;
     const candidate: unknown = snapshot.data()?.brand;
@@ -66,7 +66,7 @@ export function subscribeToCloudWorkspace(
     reconcile();
   }, onError);
 
-  const unsubscribeAudits = onSnapshot(auditsRef, (snapshot) => {
+  const unsubscribeAudits = onSnapshot(auditsRef, { includeMetadataChanges: true }, (snapshot) => {
     if (snapshot.metadata.fromCache) return;
     auditsReady = true;
     cloudAudits = snapshot.docs.map((auditDocument) => {

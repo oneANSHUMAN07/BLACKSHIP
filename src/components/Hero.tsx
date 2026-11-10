@@ -10,8 +10,28 @@ interface HeroProps {
 export const Hero: React.FC<HeroProps> = ({ onExploreClick, onSeeHowItWorksClick }) => {
   return (
     <section className="relative min-h-[92vh] flex items-center justify-center pt-28 pb-16 lg:pt-36 lg:pb-24 overflow-hidden hero-studio-backdrop">
+      <div className="hero-ribbon-field" aria-hidden="true">
+        <div className="hero-ribbon hero-ribbon--top">
+          <div className="hero-ribbon-track">
+            <span>BLACKSHIP  ◆  BRAND DNA  ◆  REVIEW  ◆  REFINE  ◆  SHIP WITH CONFIDENCE  ◆  </span>
+            <span>BLACKSHIP  ◆  BRAND DNA  ◆  REVIEW  ◆  REFINE  ◆  SHIP WITH CONFIDENCE  ◆  </span>
+          </div>
+        </div>
+        <div className="hero-ribbon hero-ribbon--middle">
+          <div className="hero-ribbon-track">
+            <span>EVERY CLAIM CHECKED  ◆  EVERY VOICE ALIGNED  ◆  BUILT FOR BRAND TRUST  ◆  </span>
+            <span>EVERY CLAIM CHECKED  ◆  EVERY VOICE ALIGNED  ◆  BUILT FOR BRAND TRUST  ◆  </span>
+          </div>
+        </div>
+        <div className="hero-ribbon hero-ribbon--bottom">
+          <div className="hero-ribbon-track">
+            <span>CREATE  ◆  AUDIT  ◆  CORRECT  ◆  APPROVE  ◆  REPEAT  ◆  </span>
+            <span>CREATE  ◆  AUDIT  ◆  CORRECT  ◆  APPROVE  ◆  REPEAT  ◆  </span>
+          </div>
+        </div>
+      </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 w-full">
+      <div className="hero-intro relative z-10 max-w-7xl mx-auto px-6 sm:px-8 w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
           {/* Left Column: Editorial Headline & Copy */}
           <div className="lg:col-span-7 flex flex-col justify-center">
@@ -77,7 +97,7 @@ export const Hero: React.FC<HeroProps> = ({ onExploreClick, onSeeHowItWorksClick
           </div>
 
           {/* Right Column: 3D Floating & Rocking Metallic Visual above Fixed Floor Spotlight */}
-          <div className="lg:col-span-5 relative flex items-center justify-center">
+          <div className="hero-visual-intro lg:col-span-5 relative flex items-center justify-center">
             {/* Fixed wide elliptical white-silver floor spotlight directly beneath the sculpture */}
             <div
               className="absolute w-[360px] sm:w-[480px] h-[160px] sm:h-[200px] -bottom-6 left-1/2 -translate-x-1/2 sculpture-floor-spotlight rounded-full pointer-events-none"
