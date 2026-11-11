@@ -222,7 +222,6 @@ export const WorkspaceApp: React.FC<{ user: WorkspaceIdentity; demo?: boolean }>
 
   if (priorDecision) {
     record.relatedDecisionId = priorDecision.id;
-    record.reviewerNote = priorDecision.reviewerNote;
   }
 
   const next = [record, ...audits].slice(0, 100);
@@ -375,7 +374,7 @@ export const WorkspaceApp: React.FC<{ user: WorkspaceIdentity; demo?: boolean }>
         <nav aria-label="Workspace navigation" className="mx-auto flex max-w-[1500px] flex-wrap gap-1 px-4 pb-3 sm:px-6 lg:hidden">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
-            return <button key={item.id} type="button" onClick={() => setPage(item.id)} aria-current={page === item.id ? 'page' : undefined} className={`inline-flex shrink-0 items-center gap-2 rounded px-3 py-2 text-[10px] font-semibold uppercase tracking-wider transition-colors ${page === item.id ? 'bg-white text-black' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}><Icon className="h-3.5 w-3.5" />{item.label}</button>;
+            return <button key={item.id} type="button" onClick={() => { if (item.id === 'auditor') setSelectedAuditId(null); setPage(item.id); }} aria-current={page === item.id ? 'page' : undefined} className={`inline-flex shrink-0 items-center gap-2 rounded px-3 py-2 text-[10px] font-semibold uppercase tracking-wider transition-colors ${page === item.id ? 'bg-white text-black' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}><Icon className="h-3.5 w-3.5" />{item.label}</button>;
           })}
         </nav>
       </header>
@@ -386,7 +385,7 @@ export const WorkspaceApp: React.FC<{ user: WorkspaceIdentity; demo?: boolean }>
           <nav aria-label="Workspace navigation" className="mt-4 space-y-1">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
-              return <button key={item.id} type="button" onClick={() => setPage(item.id)} aria-current={page === item.id ? 'page' : undefined} className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium transition-colors ${page === item.id ? 'bg-white text-black' : 'text-zinc-400 hover:bg-white/[0.06] hover:text-white'}`}><Icon className="h-4 w-4" />{item.label}{item.id === 'review-queue' && pendingAudits.length > 0 && <span className="ml-auto rounded-full bg-sky-300 px-2 py-0.5 text-[10px] font-bold text-black">{pendingAudits.length}</span>}</button>;
+              return <button key={item.id} type="button" onClick={() => { if (item.id === 'auditor') setSelectedAuditId(null); setPage(item.id); }} aria-current={page === item.id ? 'page' : undefined} className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-xs font-medium transition-colors ${page === item.id ? 'bg-white text-black' : 'text-zinc-400 hover:bg-white/[0.06] hover:text-white'}`}><Icon className="h-4 w-4" />{item.label}{item.id === 'review-queue' && pendingAudits.length > 0 && <span className="ml-auto rounded-full bg-sky-300 px-2 py-0.5 text-[10px] font-bold text-black">{pendingAudits.length}</span>}</button>;
             })}
           </nav>
           <div className="mt-8 rounded-lg border border-white/10 bg-white/[0.025] p-4">

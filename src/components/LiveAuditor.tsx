@@ -3,6 +3,7 @@ import { auditBrandCopy, loadBrandProfile, saveBrandProfile, type AuditResult, t
 import {
   applyDecisionMemory,
   findRelevantDecision,
+  textSimilarity,
   type ReviewDecision,
   type WorkspaceAuditRecord,
 } from '../utils/workspace';
@@ -153,8 +154,8 @@ function loadApprovalHistory(): ApprovalRecord[] {
   }
 }
 
-export const LiveAuditor: React.FC<LiveAuditorProps> = ({ workspaceMode = false, showExportReport = false, initialDraft, initialAuditId, initialAuditRecord, initialProfile,auditHistory = [], onProfileSave, onAuditComplete, onDecision, onCorrectionUpdate }) => {
-    const [inputText, setInputText] = useState(initialDraft ?? '');
+export const LiveAuditor: React.FC<LiveAuditorProps> = ({ workspaceMode = false, showExportReport = false, initialDraft, initialAuditId, initialAuditRecord, initialProfile, auditHistory = [], onProfileSave, onAuditComplete, onDecision, onCorrectionUpdate }) => {
+  const [inputText, setInputText] = useState(initialDraft ?? '');
   const [brandProfile, setBrandProfile] = useState<BrandProfile>(() => initialProfile ?? loadBrandProfile());
   const [saveMessage, setSaveMessage] = useState('');
   const [approvalHistory, setApprovalHistory] = useState<ApprovalRecord[]>(() => workspaceMode ? [] : loadApprovalHistory());
@@ -163,175 +164,188 @@ export const LiveAuditor: React.FC<LiveAuditorProps> = ({ workspaceMode = false,
   const [reviewerNote, setReviewerNote] = useState('');
   const [correctionDraft, setCorrectionDraft] = useState(initialAuditRecord?.suggestedCopy ?? '');
   const [correctionIgnored, setCorrectionIgnored] = useState(false);
-  const [hasRunAudit, setHasRunAudit] = useState(!workspaceMode || Boolean(initialAuditId));
+  const [hasRunAudit, setHasRunAudit] = useState(Boolean(initialAuditId && initialAuditRecord));
   const [activeAuditId, setActiveAuditId] = useState<string | null>(initialAuditId ?? null);
-  const localAuditResult = auditBrandCopy(inputText, brandProfile);
+  const [loadedAuditRecord, setLoadedAuditRecord] = useState<WorkspaceAuditRecord | null>(initialAuditRecord ?? null);
   const [aiAuditResult, setAiAuditResult] = useState<AuditResult | null>(null);
   const [isAuditing, setIsAuditing] = useState(false);
+  const [isDeciding, setIsDeciding] = useState(false);
+  const [isApplyingCorrection, setIsApplyingCorrection] = useState(false);
   const [auditError, setAuditError] = useState('');
-const priorDecision = workspaceMode
-  ? findRelevantDecision(inputText, auditHistory)
-  : undefined;
 
-const baseAuditResult =
-  initialAuditId && initialAuditRecord
-    ? {
-        score: initialAuditRecord.score,
-        status: initialAuditRecord.status,
-        violations: initialAuditRecord.violations,
-        suggestedCopy: initialAuditRecord.suggestedCopy,
-      }
-    : aiAuditResult ?? localAuditResult;
+  const localAuditResult = auditBrandCopy(inputText, brandProfile);
+  const priorDecision = workspaceMode
+    ? findRelevantDecision(inputText, auditHistory)
+    : undefined;
 
-const auditResult =
-  initialAuditId && initialAuditRecord
-    ? baseAuditResult
-    : applyDecisionMemory(baseAuditResult, priorDecision);
-const isEmptyDraft = !inputText.trim() && !hasRunAudit;
+  const baseAuditResult =
+    activeAuditId && loadedAuditRecord
+      ? {
+          score: loadedAuditRecord.score,
+          status: loadedAuditRecord.status,
+          violations: loadedAuditRecord.violations,
+          suggestedCopy: loadedAuditRecord.suggestedCopy,
+        }
+      : aiAuditResult ?? localAuditResult;
+
+  const auditResult =
+    activeAuditId && loadedAuditRecord
+      ? baseAuditResult
+      : applyDecisionMemory(baseAuditResult, priorDecision);
+
   const policySnapshot = JSON.stringify(brandProfile);
-  const serverApproval = initialAuditRecord?.decision ? {
-    id: initialAuditRecord.id,
-    brandName: initialAuditRecord.brandName,
-    copy: initialAuditRecord.draft,
-    score: initialAuditRecord.score,
-    violationCount: initialAuditRecord.violations.length,
-    decision: initialAuditRecord.decision,
-    reviewerNote: initialAuditRecord.reviewerNote ?? '',
-    approvedAt: initialAuditRecord.decidedAt ?? initialAuditRecord.auditedAt,
+  const serverApproval = loadedAuditRecord?.decision ? {
+    id: loadedAuditRecord.id,
+    brandName: loadedAuditRecord.brandName,
+    copy: loadedAuditRecord.draft,
+    score: loadedAuditRecord.score,
+    violationCount: loadedAuditRecord.violations.length,
+    decision: loadedAuditRecord.decision,
+    reviewerNote: loadedAuditRecord.reviewerNote ?? '',
+    approvedAt: loadedAuditRecord.decidedAt ?? loadedAuditRecord.auditedAt,
   } as ApprovalRecord : null;
+
   const currentApproval = workspaceMode
     ? decisionRecord?.copy === inputText ? decisionRecord : serverApproval?.copy === inputText ? serverApproval : undefined
     : approvalHistory.find((record) => record.id === currentApprovalId && record.copy === inputText && record.brandName === brandProfile.brandName && record.policySnapshot === policySnapshot);
-const handleDraftChange = (nextText: string) => {
-  setInputText(nextText);
-  setCorrectionDraft('');
-  setCorrectionIgnored(false);
-  setCurrentApprovalId(null);
-  setReviewerNote('');
 
-  if (workspaceMode) {
-    setHasRunAudit(false);
-    setActiveAuditId(null);
-  }
-};
-
-const handleRunAudit = async () => {
-  if (!inputText.trim() || isAuditing) return;
-
-  setIsAuditing(true);
-  setAuditError('');
-  setCorrectionIgnored(false);
-  setCurrentApprovalId(null);
-  const controller = new AbortController();
-  const requestTimeout = window.setTimeout(() => controller.abort(), 15000);
-
-  try {
-    const response = await fetch('http://127.0.0.1:8000/api/audit', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        content: inputText,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(data.error || 'Adaption audit failed');
-    }
-
-    const parsedAI = parseAdaptionResult(data.ai_result);
-    const aiResult = mapAdaptionResult(parsedAI, inputText);
-
-    // IMPORTANT:
-    // AI result is saved first.
-    setAiAuditResult(aiResult);
-    setCorrectionDraft(aiResult.suggestedCopy);
-    setHasRunAudit(true);
-
-    // History callback failure should NOT destroy the AI result.
-    try {
-      const auditId =
-        onAuditComplete?.(
-          inputText,
-          brandProfile,
-          aiResult
-        ) ?? null;
-
-      setActiveAuditId(auditId);
-    } catch (callbackError) {
-      console.error(
-        'BLACKSHIP audit history callback error:',
-        callbackError
-      );
-
-      setActiveAuditId(null);
-    }
-  } catch (error) {
-    console.error(
-      'BLACKSHIP Adaption audit error:',
-      error
-    );
-
-    setAuditError(
-      error instanceof DOMException && error.name === 'AbortError'
-        ? 'Adaption took too long to respond. The local rule audit was used instead.'
-        : error instanceof Error
-          ? error.message
-          : 'Unable to connect to BLACKSHIP AI audit server.'
-    );
-
-    // ONLY fallback if the actual AI request failed.
-    setAiAuditResult(null);
-    setCorrectionDraft(localAuditResult.suggestedCopy);
-    setHasRunAudit(true);
-
-    try {
-      const auditId =
-        onAuditComplete?.(
-          inputText,
-          brandProfile,
-          localAuditResult
-        ) ?? null;
-
-      setActiveAuditId(auditId);
-    } catch (callbackError) {
-      console.error(
-        'BLACKSHIP local audit history callback error:',
-        callbackError
-      );
-
-      setActiveAuditId(null);
-    }
-  } finally {
-    window.clearTimeout(requestTimeout);
-    setIsAuditing(false);
-  }
-};
-
-  const handleApplyCorrection = (value: string, status: 'applied' | 'edited') => {
-    const correctedCopy = value.trim();
-    if (!correctedCopy) return;
-    const correctedResult = auditBrandCopy(correctedCopy, brandProfile);
-    setInputText(correctedCopy);
-    setCorrectionDraft(correctedResult.suggestedCopy);
+  const handleDraftChange = (nextText: string) => {
+    setInputText(nextText);
+    setCorrectionDraft('');
     setCorrectionIgnored(false);
     setCurrentApprovalId(null);
     setDecisionRecord(null);
     setReviewerNote('');
-    setHasRunAudit(true);
-    onCorrectionUpdate?.(activeAuditId, correctedCopy, correctedResult, status);
+    setHasRunAudit(false);
+    setActiveAuditId(null);
+    setLoadedAuditRecord(null);
+    setAiAuditResult(null);
+    setAuditError('');
   };
-  const correctionPreview = correctionDraft || auditResult.suggestedCopy;
-  const correctionHasChanges = correctionPreview.trim() !== inputText.trim();
+
+  const handleRunAudit = async () => {
+    if (!inputText.trim() || isAuditing) return;
+
+    setIsAuditing(true);
+    setAuditError('');
+    setCorrectionIgnored(false);
+    setCurrentApprovalId(null);
+    setDecisionRecord(null);
+    const controller = new AbortController();
+    const requestTimeout = window.setTimeout(() => controller.abort(), 15000);
+
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/audit', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: inputText,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Adaption audit failed');
+      }
+
+      const parsedAI = parseAdaptionResult(data.ai_result);
+      const aiResult = mapAdaptionResult(parsedAI, inputText);
+
+      setAiAuditResult(aiResult);
+      setLoadedAuditRecord(null);
+      setCorrectionDraft(aiResult.suggestedCopy);
+      setHasRunAudit(true);
+
+      try {
+        const auditId =
+          onAuditComplete?.(
+            inputText,
+            brandProfile,
+            aiResult
+          ) ?? null;
+
+        setActiveAuditId(auditId);
+      } catch (callbackError) {
+        console.error(
+          'BLACKSHIP audit history callback error:',
+          callbackError
+        );
+
+        setActiveAuditId(null);
+      }
+    } catch (error) {
+      console.warn(
+        'BLACKSHIP Adaption audit note (using local governance rule engine):',
+        error
+      );
+
+      setAuditError(
+        error instanceof DOMException && error.name === 'AbortError'
+          ? 'Adaption took too long to respond. The local rule audit was used instead.'
+          : error instanceof Error
+            ? error.message
+            : 'Unable to connect to BLACKSHIP AI audit server.'
+      );
+
+      // ONLY fallback if the actual AI request failed.
+      setAiAuditResult(null);
+      setLoadedAuditRecord(null);
+      const localResultWithMemory = applyDecisionMemory(localAuditResult, priorDecision);
+      setCorrectionDraft(localResultWithMemory.suggestedCopy);
+      setHasRunAudit(true);
+
+      try {
+        const auditId =
+          onAuditComplete?.(
+            inputText,
+            brandProfile,
+            localResultWithMemory
+          ) ?? null;
+
+        setActiveAuditId(auditId);
+      } catch (callbackError) {
+        console.error(
+          'BLACKSHIP local audit history callback error:',
+          callbackError
+        );
+
+        setActiveAuditId(null);
+      }
+    } finally {
+      window.clearTimeout(requestTimeout);
+      setIsAuditing(false);
+    }
+  };
+
+  const handleApplyCorrection = (value: string, status: 'applied' | 'edited') => {
+    const correctedCopy = value.trim();
+    if (!correctedCopy || isApplyingCorrection) return;
+    setIsApplyingCorrection(true);
+    try {
+      const correctedResult = auditBrandCopy(correctedCopy, brandProfile);
+      setInputText(correctedCopy);
+      setCorrectionDraft(correctedResult.suggestedCopy);
+      setCorrectionIgnored(false);
+      setCurrentApprovalId(null);
+      setDecisionRecord(null);
+      setReviewerNote('');
+      setHasRunAudit(true);
+      setLoadedAuditRecord(null);
+      setAiAuditResult(correctedResult);
+      onCorrectionUpdate?.(activeAuditId, correctedCopy, correctedResult, status);
+    } finally {
+      setIsApplyingCorrection(false);
+    }
+  };
 
   const handleHumanDecision = (decision: ApprovalRecord['decision']) => {
-    if (!inputText.trim()) return;
-    if (workspaceMode && !hasRunAudit) return;
+    if (!inputText.trim() || !hasRunAudit || isDeciding) return;
     if (decision !== 'approved' && !reviewerNote.trim()) return;
+    setIsDeciding(true);
     const record: ApprovalRecord = {
       id: `${Date.now()}`,
       brandName: brandProfile.brandName || 'Untitled brand',
@@ -356,6 +370,8 @@ const handleRunAudit = async () => {
       setReviewerNote('');
     } catch {
       setCurrentApprovalId(null);
+    } finally {
+      setIsDeciding(false);
     }
   };
 
@@ -541,17 +557,22 @@ const updateCustomRule = <K extends keyof CustomBrandRule,>(index: number, field
   </div>
 )}
 <span className="text-xs text-zinc-500">{hasRunAudit ? 'This draft is recorded in the audit history.' : 'Run the audit to record this draft and enable reviewer decisions.'}</span></div>}
-{priorDecision && (
+{hasRunAudit && priorDecision && (
   <div className="mb-4 rounded-lg border border-sky-300/20 bg-sky-300/[0.04] p-4">
-    <p className="text-[10px] font-semibold uppercase tracking-widest text-sky-300">
-      Similar prior review · {priorDecision.decision?.replace('_', ' ')}
-    </p>
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-sky-300">
+        Similar prior review · {priorDecision.decision?.replace('_', ' ')}
+      </p>
+      <span className="font-mono text-[10px] text-zinc-400">
+        {Math.round(textSimilarity(inputText, priorDecision.draft) * 100)}% text similarity
+      </span>
+    </div>
     <p className="mt-2 text-xs text-zinc-300">
       {priorDecision.reviewerNote ||
         'A reviewer decision was recorded for similar content.'}
     </p>
     <p className="mt-2 text-[10px] text-zinc-500">
-      The audit score and suggested copy include this review context.
+      Previous human decision is surfaced as context; it does not automatically decide this new audit.
     </p>
   </div>
 )}
@@ -562,28 +583,60 @@ const updateCustomRule = <K extends keyof CustomBrandRule,>(index: number, field
                   <CheckCircle className="w-3.5 h-3.5 text-zinc-300" />
                   <span>Smart Corrections</span>
                 </span>
-                {auditResult.violations.length > 0 && <span className="text-[10px] uppercase tracking-wider text-zinc-500">{correctionIgnored ? 'Correction ignored' : 'Review before applying'}</span>}
+                {hasRunAudit && auditResult.violations.length > 0 && (
+                  <span className="text-[10px] uppercase tracking-wider text-zinc-500">
+                    {correctionIgnored ? 'Correction ignored' : 'Review before applying'}
+                  </span>
+                )}
               </div>
-              {isEmptyDraft ? (
-                <div className="p-3.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-zinc-400">Add content above to see suggested corrections.</div>
+              {!hasRunAudit ? (
+                <div className="p-3.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-zinc-400">
+                  {!inputText.trim()
+                    ? 'Add content above to see suggested corrections.'
+                    : 'Run the brand audit to generate correction suggestions.'}
+                </div>
               ) : auditResult.violations.length === 0 ? (
-                <div className="p-3.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-zinc-300">No correction is needed. The draft currently satisfies the configured rules.</div>
+                <div className="p-3.5 rounded-lg bg-white/[0.03] border border-white/10 text-sm text-zinc-300">
+                  No correction is needed. The draft currently satisfies the configured rules.
+                </div>
               ) : (
                 <>
-                  <textarea value={correctionDraft} onChange={(event) => setCorrectionDraft(event.target.value)} rows={4} disabled={correctionIgnored} aria-label="Suggested corrected copy" className="w-full resize-y rounded-lg bg-white/[0.03] border border-white/10 p-3.5 text-sm font-sans text-zinc-200 focus:outline-none focus:border-white/30 disabled:opacity-50" />
+                  <textarea
+                    value={correctionDraft}
+                    onChange={(event) => setCorrectionDraft(event.target.value)}
+                    rows={4}
+                    disabled={correctionIgnored}
+                    aria-label="Suggested corrected copy"
+                    className="w-full resize-y rounded-lg bg-white/[0.03] border border-white/10 p-3.5 text-sm font-sans text-zinc-200 focus:outline-none focus:border-white/30 disabled:opacity-50"
+                  />
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" disabled={correctionIgnored || !inputText.trim()} onClick={() => {
-                      const value = correctionDraft;
-                      handleApplyCorrection(value, 'applied');
-                    }} className="min-h-10 rounded bg-white px-4 text-[10px] font-bold uppercase tracking-widest text-black hover:bg-zinc-200 disabled:opacity-40">Apply</button>
-                    <button type="button" disabled={correctionIgnored || !correctionDraft.trim()} onClick={() => {
-                      const value = correctionDraft.trim();
-                      handleApplyCorrection(value, 'edited');
-                    }} className="min-h-10 rounded border border-white/20 px-4 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-40">Edit & Apply</button>
-                    <button type="button" onClick={() => {
-                      setCorrectionIgnored(true);
-                      onCorrectionUpdate?.(activeAuditId, correctionDraft || auditResult.suggestedCopy, auditResult, 'ignored');
-                    }} className="min-h-10 rounded border border-white/10 px-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-white">Ignore</button>
+                    <button
+                      type="button"
+                      disabled={correctionIgnored || !inputText.trim() || isApplyingCorrection}
+                      onClick={() => handleApplyCorrection(correctionDraft, 'applied')}
+                      className="min-h-10 rounded bg-white px-4 text-[10px] font-bold uppercase tracking-widest text-black hover:bg-zinc-200 disabled:opacity-40 cursor-pointer"
+                    >
+                      Apply
+                    </button>
+                    <button
+                      type="button"
+                      disabled={correctionIgnored || !correctionDraft.trim() || isApplyingCorrection}
+                      onClick={() => handleApplyCorrection(correctionDraft.trim(), 'edited')}
+                      className="min-h-10 rounded border border-white/20 px-4 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-white/10 disabled:opacity-40 cursor-pointer"
+                    >
+                      Edit & Apply
+                    </button>
+                    <button
+                      type="button"
+                      disabled={correctionIgnored}
+                      onClick={() => {
+                        setCorrectionIgnored(true);
+                        onCorrectionUpdate?.(activeAuditId, correctionDraft || auditResult.suggestedCopy, auditResult, 'ignored');
+                      }}
+                      className="min-h-10 rounded border border-white/10 px-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-white cursor-pointer"
+                    >
+                      Ignore
+                    </button>
                   </div>
                   {auditResult.violations.map((violation, idx) => (
                     <div key={idx} className="mt-3 rounded-lg border border-white/10 bg-black/30 p-3">
@@ -607,7 +660,7 @@ const updateCustomRule = <K extends keyof CustomBrandRule,>(index: number, field
               </span>
               <span
                 className={`text-xs font-mono uppercase font-bold tracking-widest px-2.5 py-0.5 rounded border ${
-                  isEmptyDraft
+                  !hasRunAudit
                     ? 'border-white/10 text-zinc-500 bg-transparent'
                     : auditResult.status === 'passed'
                     ? 'border-white/30 text-white bg-white/10'
@@ -616,7 +669,7 @@ const updateCustomRule = <K extends keyof CustomBrandRule,>(index: number, field
                     : 'border-zinc-500/40 text-zinc-300 bg-zinc-900'
                 }`}
               >
-                {isEmptyDraft ? 'READY' : auditResult.status.toUpperCase()}
+                {!hasRunAudit ? 'READY' : auditResult.status.toUpperCase()}
               </span>
             </div>
 
@@ -627,7 +680,7 @@ const updateCustomRule = <K extends keyof CustomBrandRule,>(index: number, field
                   Rule Engine Score
                 </span>
                 <span className="text-3xl font-editorial font-bold text-white tracking-tight">
-                  {isEmptyDraft ? '—' : `${auditResult.score} / 100`}
+                  {!hasRunAudit ? '—' : `${auditResult.score} / 100`}
                 </span>
               </div>
               <div className="text-right">
@@ -635,7 +688,7 @@ const updateCustomRule = <K extends keyof CustomBrandRule,>(index: number, field
                   Violations Detected
                 </span>
                 <span className="text-xl font-mono font-bold text-white">
-                  {isEmptyDraft ? '—' : auditResult.violations.length}
+                  {!hasRunAudit ? '—' : auditResult.violations.length}
                 </span>
               </div>
             </div>
@@ -644,21 +697,73 @@ const updateCustomRule = <K extends keyof CustomBrandRule,>(index: number, field
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <span className="block text-[10px] uppercase font-mono tracking-widest text-zinc-400">Human decision</span>
-                  <span className="mt-1 block text-sm font-semibold text-white">{currentApproval ? currentApproval.decision.replace('_', ' ').replace(/^./, (letter) => letter.toUpperCase()) : 'Awaiting reviewer decision'}</span>
+                  <span className="mt-1 block text-sm font-semibold text-white">
+                    {!hasRunAudit
+                      ? 'Awaiting audit run'
+                      : currentApproval
+                      ? currentApproval.decision.replace('_', ' ').replace(/^./, (letter) => letter.toUpperCase())
+                      : 'Awaiting reviewer decision'}
+                  </span>
                 </div>
               </div>
               <label className="mt-4 block text-[10px] uppercase font-mono tracking-widest text-zinc-400">
                 Reviewer note <span className="normal-case tracking-normal text-zinc-500">(required for changes or rejection)</span>
-                <textarea value={reviewerNote} onChange={(event) => setReviewerNote(event.target.value)} rows={2} placeholder="Explain what should change or why this is rejected..." className="mt-2 w-full resize-y rounded border border-white/10 bg-black/50 p-3 text-sm normal-case tracking-normal text-white placeholder:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" />
+                <textarea
+                  value={reviewerNote}
+                  onChange={(event) => setReviewerNote(event.target.value)}
+                  rows={2}
+                  disabled={!hasRunAudit}
+                  placeholder={hasRunAudit ? "Explain what should change or why this is rejected..." : "Run brand audit first to enable reviewer note..."}
+                  className="mt-2 w-full resize-y rounded border border-white/10 bg-black/50 p-3 text-sm normal-case tracking-normal text-white placeholder:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-40"
+                />
               </label>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" onClick={() => handleHumanDecision('approved')} disabled={!inputText.trim() || (workspaceMode && !hasRunAudit)} className="min-h-11 rounded bg-white px-4 text-xs font-bold uppercase tracking-widest text-black transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">{auditResult.violations.length > 0 ? 'Approve with flags' : 'Approve content'}</button>
-                <button type="button" onClick={() => handleHumanDecision('changes_requested')} disabled={!inputText.trim() || !reviewerNote.trim() || (workspaceMode && !hasRunAudit)} className="min-h-11 rounded border border-white/20 px-4 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">Request changes</button>
-                <button type="button" onClick={() => handleHumanDecision('rejected')} disabled={!inputText.trim() || !reviewerNote.trim() || (workspaceMode && !hasRunAudit)} className="min-h-11 rounded border border-white/20 px-4 text-xs font-bold uppercase tracking-widest text-zinc-300 transition-colors hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">Reject</button>
+                <button
+                  type="button"
+                  onClick={() => handleHumanDecision('approved')}
+                  disabled={!inputText.trim() || !hasRunAudit || isDeciding}
+                  className="min-h-11 rounded bg-white px-4 text-xs font-bold uppercase tracking-widest text-black transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                >
+                  {hasRunAudit && auditResult.violations.length > 0 ? 'Approve with flags' : 'Approve content'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleHumanDecision('changes_requested')}
+                  disabled={!inputText.trim() || !reviewerNote.trim() || !hasRunAudit || isDeciding}
+                  className="min-h-11 rounded border border-white/20 px-4 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                >
+                  Request changes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleHumanDecision('rejected')}
+                  disabled={!inputText.trim() || !reviewerNote.trim() || !hasRunAudit || isDeciding}
+                  className="min-h-11 rounded border border-white/20 px-4 text-xs font-bold uppercase tracking-widest text-zinc-300 transition-colors hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                >
+                  Reject
+                </button>
               </div>
-              {showExportReport && <button type="button" onClick={handleExportReport} disabled={!inputText.trim() || (workspaceMode && !hasRunAudit)} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded border border-white/15 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-white/35 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><Download className="h-4 w-4" /> Download audit report</button>}
-              {currentApproval && <p role="status" className="mt-3 text-xs text-zinc-400">{workspaceMode ? 'Decision saved to this audit' : 'Decision saved on this device'} · {new Date(currentApproval.approvedAt).toLocaleString()}{currentApproval.reviewerNote ? ` · ${currentApproval.reviewerNote}` : ''}</p>}
-              {!currentApproval && <p className="mt-3 text-xs text-zinc-500">Review decisions are saved with the audit record.</p>}
+              {showExportReport && (
+                <button
+                  type="button"
+                  onClick={handleExportReport}
+                  disabled={!inputText.trim() || !hasRunAudit}
+                  className="mt-3 inline-flex min-h-10 items-center gap-2 rounded border border-white/15 px-3 text-xs font-semibold uppercase tracking-wider text-zinc-300 transition-colors hover:border-white/35 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                >
+                  <Download className="h-4 w-4" /> Download audit report
+                </button>
+              )}
+              {hasRunAudit && currentApproval && (
+                <p role="status" className="mt-3 text-xs text-zinc-400">
+                  {workspaceMode ? 'Decision saved to this audit' : 'Decision saved on this device'} · {new Date(currentApproval.approvedAt).toLocaleString()}{currentApproval.reviewerNote ? ` · ${currentApproval.reviewerNote}` : ''}
+                </p>
+              )}
+              {hasRunAudit && !currentApproval && (
+                <p className="mt-3 text-xs text-zinc-500">Review decisions are saved with the audit record.</p>
+              )}
+              {!hasRunAudit && (
+                <p className="mt-3 text-xs text-zinc-500">Run the brand audit above to enable reviewer decisions.</p>
+              )}
             </div>
 
             <div id="review-history" className="mb-6">
@@ -684,8 +789,12 @@ const updateCustomRule = <K extends keyof CustomBrandRule,>(index: number, field
                 Active Policy Hits:
               </span>
 
-              {isEmptyDraft ? (
-                <div className="p-4 rounded-lg border border-white/10 bg-white/[0.02] text-xs text-zinc-400">Add content above to check it against your Brand DNA.</div>
+              {!hasRunAudit ? (
+                <div className="p-4 rounded-lg border border-white/10 bg-white/[0.02] text-xs text-zinc-400">
+                  {!inputText.trim()
+                    ? 'Add content above to check it against your Brand DNA.'
+                    : 'Run the brand audit to see the diagnostic result.'}
+                </div>
               ) : auditResult.violations.length === 0 ? (
                 <div className="p-4 rounded-lg border border-white/15 bg-white/[0.03] text-xs text-zinc-300 flex items-center gap-3">
                   <ShieldCheck className="w-5 h-5 text-white shrink-0" />

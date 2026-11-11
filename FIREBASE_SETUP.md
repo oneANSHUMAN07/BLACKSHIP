@@ -8,7 +8,11 @@ You can still use **Continue as Demo** on the login page without Firebase config
 
 1. In the Firebase console, create a project or select an existing one, then register a **Web app** under Project settings.
 2. Open **Authentication → Sign-in method** and enable **Email/Password** and **Google**.
-3. In Authentication settings, keep email-enumeration protection enabled. Add `localhost` and the production site's domain to the authorized domains list.
+3. In Authentication settings, keep email-enumeration protection enabled. In the **Authorized domains** list, ensure the following are added:
+   - `localhost` (for local development)
+   - `oneblackship.xyz` (production custom domain)
+   - `ais-dev-pqxj5v5b6yc5fbin3uqd6j-340298743077.asia-southeast1.run.app` (Google AI Studio development preview)
+   - `ais-pre-pqxj5v5b6yc5fbin3uqd6j-340298743077.asia-southeast1.run.app` (Google AI Studio shared preview)
 4. In the project folder containing `package.json`, copy `.env.example` to `.env.local` and fill in `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, and `VITE_FIREBASE_APP_ID` from the Firebase Web app config.
 5. In Firebase Console, open **Firestore Database → Create database** and create a database. Choose a region close to your users.
 6. Open the Firestore **Rules** tab, replace the starter rules with the contents of `firestore.rules`, then publish the rules. These rules let each signed-in account read and write only its own workspace.

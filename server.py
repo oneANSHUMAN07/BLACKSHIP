@@ -18,11 +18,13 @@ CORS(app)
 
 # Adaption API configuration
 api_key = os.getenv("ADAPTION_API_KEY")
+client = None
 
-if not api_key:
-    raise RuntimeError("ADAPTION_API_KEY is missing")
-
-client = Adaption(api_key=api_key)
+if api_key:
+    try:
+        client = Adaption(api_key=api_key)
+    except Exception:
+        client = None
 
 
 @app.get("/api/health")
@@ -42,6 +44,12 @@ def audit():
         return jsonify({
             "error": "Content is required"
         }), 400
+
+    if not client:
+        return jsonify({
+            "success": False,
+            "error": "Adaption API key is missing or client is not configured"
+        }), 503
 
     prompt = f"""
 You are BLACKSHIP, a brand governance auditor.

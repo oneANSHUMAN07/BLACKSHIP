@@ -160,12 +160,132 @@ export const PHRASE_REMEDIATIONS: PhraseRemediation[] = [
 
   // Preset 2: Risky Regulatory Guarantee
   {
+    keyword: 'guaranteed',
+    replacement: 'engineered',
+    category: 'claims',
+    severity: 'critical',
+    explanation:
+      'Eliminate absolute legal warranty "guaranteed" to adhere to corporate regulatory compliance standards.',
+  },
+  {
+    keyword: 'guarantees',
+    replacement: 'is designed to deliver',
+    category: 'claims',
+    severity: 'critical',
+    explanation:
+      'Eliminate absolute promise "guarantees" in favor of substantiated performance language.',
+  },
+  {
     keyword: 'guarantee',
     replacement: 'deliver',
     category: 'claims',
     severity: 'critical',
     explanation:
       'Eliminate absolute legal warranty "guarantee" to adhere to corporate regulatory compliance standards.',
+  },
+  {
+    keyword: 'perfect results',
+    replacement: 'high-quality outcomes',
+    category: 'claims',
+    severity: 'critical',
+    explanation:
+      'Replace unprovable absolute performance claim "perfect results" with defensible quality terminology.',
+  },
+  {
+    keyword: 'zero side effects',
+    replacement: 'a well-tolerated profile',
+    category: 'claims',
+    severity: 'critical',
+    explanation:
+      'Eliminate absolute zero-risk health claim "zero side effects" in compliance with advertising standards.',
+  },
+  {
+    keyword: 'completely risk-free',
+    replacement: 'backed by robust quality standards',
+    category: 'claims',
+    severity: 'critical',
+    explanation:
+      'Replace absolute liability claim "completely risk-free" with verified governance standards.',
+  },
+  {
+    keyword: 'risk-free',
+    replacement: 'low-risk',
+    category: 'claims',
+    severity: 'warning',
+    explanation:
+      'Replace absolute risk exemption "risk-free" with measured risk terminology.',
+  },
+  {
+    keyword: 'permanently removes acne',
+    replacement: 'helps reduce the appearance of acne',
+    category: 'claims',
+    severity: 'critical',
+    explanation:
+      'Replace unproven permanence and curative disease claims with conservative cosmetic appearance wording.',
+  },
+  {
+    keyword: 'permanently remove acne',
+    replacement: 'help reduce the appearance of acne',
+    category: 'claims',
+    severity: 'critical',
+    explanation:
+      'Replace unproven permanence and curative disease claims with conservative cosmetic appearance wording.',
+  },
+  {
+    keyword: 'removes acne',
+    replacement: 'helps reduce the appearance of acne',
+    category: 'claims',
+    severity: 'warning',
+    explanation:
+      'Replace curative disease claim "removes acne" with cosmetic appearance phrasing.',
+  },
+  {
+    keyword: 'remove acne',
+    replacement: 'reduce the appearance of acne',
+    category: 'claims',
+    severity: 'warning',
+    explanation:
+      'Replace curative disease claim "remove acne" with cosmetic appearance phrasing.',
+  },
+  {
+    keyword: 'permanent results',
+    replacement: 'long-lasting results',
+    category: 'claims',
+    severity: 'critical',
+    explanation:
+      'Replace unverified permanence claim "permanent results" with defensible duration phrasing "long-lasting results".',
+  },
+  {
+    keyword: 'permanently',
+    replacement: 'consistently',
+    category: 'claims',
+    severity: 'critical',
+    explanation:
+      'Eliminate absolute permanence claim "permanently" in compliance with advertising standards.',
+  },
+  {
+    keyword: 'permanent',
+    replacement: 'long-lasting',
+    category: 'claims',
+    severity: 'critical',
+    explanation:
+      'Replace unverified permanence claim "permanent" with defensible duration phrasing "long-lasting".',
+  },
+  {
+    keyword: 'safest',
+    replacement: 'extensively tested',
+    category: 'claims',
+    severity: 'warning',
+    explanation:
+      'Replace superlative safety claim "safest" with substantiated testing language.',
+  },
+  {
+    keyword: 'most effective',
+    replacement: 'highly effective',
+    category: 'claims',
+    severity: 'warning',
+    explanation:
+      'Replace superlative efficacy claim "most effective" with defensible qualification.',
   },
   {
     keyword: '100% foolproof',

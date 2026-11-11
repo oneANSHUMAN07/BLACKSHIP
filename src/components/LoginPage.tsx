@@ -28,8 +28,10 @@ function authErrorMessage(error: unknown): string {
       return 'Enter a valid email address.';
     case 'auth/operation-not-allowed':
       return 'Enable Email/Password and Google providers in Firebase Authentication settings.';
-    case 'auth/unauthorized-domain':
-      return 'Add this website domain to Firebase Authentication’s authorized domains.';
+    case 'auth/unauthorized-domain': {
+      const currentHost = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'this domain';
+      return `Domain unauthorized: "${currentHost}" is not in Firebase Authentication's Authorized Domains list for project "blackship-workspace". To sign in with Google here, add "${currentHost}" in Firebase Console > Authentication > Settings > Authorized domains. For immediate testing, you can use "Continue as Demo" below.`;
+    }
     case 'auth/popup-blocked':
       return 'Your browser blocked the Google sign-in popup. Allow popups and try again.';
     case 'auth/popup-closed-by-user':

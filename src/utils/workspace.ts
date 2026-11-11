@@ -96,7 +96,7 @@ export function findRelevantDecision(
       audit,
       similarity: textSimilarity(draft, audit.draft),
     }))
-    .filter(({ similarity }) => similarity >= 0.6)
+    .filter(({ similarity }) => similarity >= 0.5)
     .sort(
       (left, right) =>
         right.similarity - left.similarity ||
