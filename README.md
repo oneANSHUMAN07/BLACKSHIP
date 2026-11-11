@@ -2,6 +2,8 @@
 
 BLACKSHIP is a brand governance workspace designed to help teams audit marketing content against defined brand and compliance rules, review detected issues, apply safer corrections, and maintain an auditable record of content decisions.
 
+Live Product Link : https://www.oneblackship.xyz/
+
 ## Core Product Capabilities
 
 ### Brand DNA
