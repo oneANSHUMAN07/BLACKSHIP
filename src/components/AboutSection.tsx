@@ -1,4 +1,5 @@
 import React from 'react';
+import brandFeatureShield from '../assets/images/brand_feature_shield_1793811015911.jpg';
 import { Shield, Eye, Lock } from 'lucide-react';
 
 export const AboutSection: React.FC = () => {
@@ -79,7 +80,7 @@ export const AboutSection: React.FC = () => {
               }}
             >
               <img
-                src="/src/assets/images/brand_feature_shield_1793811015911.jpg"
+                src={brandFeatureShield}
                 alt="BLACKSHIP Faceted Metallic Seal of Brand Invariance"
                 className="w-4/5 h-4/5 object-contain filter drop-shadow-[0_15px_35px_rgba(0,0,0,0.9)]"
                 loading="lazy"
