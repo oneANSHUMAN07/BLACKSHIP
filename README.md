@@ -4,6 +4,75 @@ BLACKSHIP is a brand governance workspace designed to help teams audit marketing
 
 Live Product Link : https://www.oneblackship.xyz/
 
+## How to Use
+
+### 1. Open BLACKSHIP
+Visit the live BLACKSHIP application:
+
+**https://www.oneblackship.xyz/**
+
+### 2. Sign In or Use Demo Account
+Sign in with your account to access the workspace. If demo mode is available, use the demo option to explore the product without setting up a separate account.
+
+### 3. Set Up Brand DNA
+Open **Brand DNA** and add your brand information, including:
+- Brand guidelines
+- Approved facts
+- Brand preferences and assets
+
+This information is used as context during content review.
+
+### 4. Audit Content
+Open **Content Auditor** and enter the marketing/content copy you want to check.
+
+BLACKSHIP analyzes the content against the configured brand rules and identifies potential issues such as:
+- Brand guideline violations
+- Unsupported or problematic claims
+- Inconsistent messaging
+
+### 5. Review AI Findings
+Check the audit score, detected violations, explanations, and suggested correction.
+
+### 6. Use Smart Corrections
+When a correction is available, you can:
+- **Apply** the suggested correction
+- **Edit & Apply** the correction before using it
+- **Ignore** the suggestion
+
+After applying or editing a correction, BLACKSHIP re-audits the updated content.
+
+### 7. Make a Human Review Decision
+Reviewers can record a final decision:
+- **Approved**
+- **Rejected**
+- **Changes Requested**
+
+For non-approved decisions, a reviewer note can be added to explain the decision.
+
+### 8. Use Brand Memory
+Open **Brand Memory** to view previous human review decisions and similar past audits.
+
+Previous decisions are shown as review context when similar content is encountered again, helping maintain consistency without automatically deciding the new audit.
+
+### 9. View Audit History
+Open **Audit History** to review saved audits, including:
+- Original content
+- Audit score and violations
+- Suggested corrections
+- Applied/edited corrections
+- Review decisions
+- Reviewer notes
+- Decision timestamps
+
+### 10. Reports & Export
+Use the **Reports** section to review saved audit and review activity and export audit information when required.
+
+### Typical Workflow
+
+**Brand DNA → Content Audit → AI Analysis → Smart Corrections → Human Review → Brand Memory / Audit History**
+
+BLACKSHIP is designed so that a reviewer can complete the full content-governance workflow without requiring a separate walkthrough.
+
 ## Core Product Capabilities
 
 ### Brand DNA
