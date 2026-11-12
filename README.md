@@ -9,7 +9,9 @@ Live Product Link : https://www.oneblackship.xyz/
 ### 1. Open BLACKSHIP
 Open the deployed BLACKSHIP website and enter the workspace through **Get Started**.
 
-![Uploading image.png…]()
+<img width="1917" height="1090" alt="image" src="https://github.com/user-attachments/assets/239e7e28-34e7-4a5f-8c42-f77a2d33bc17" />
+
+
 
 
 ### 2. Sign In / Demo Mode
