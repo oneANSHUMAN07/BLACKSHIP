@@ -7,72 +7,68 @@ Live Product Link : https://www.oneblackship.xyz/
 ## How to Use
 
 ### 1. Open BLACKSHIP
-Visit the live BLACKSHIP application:
+Open the deployed BLACKSHIP website and enter the workspace through **Get Started**.
 
-**https://www.oneblackship.xyz/**
+![BLACKSHIP Landing Page](./public/blackship-landing.png)
 
-### 2. Sign In or Use Demo Account
-Sign in with your account to access the workspace. If demo mode is available, use the demo option to explore the product without setting up a separate account.
+### 2. Sign In / Demo Mode
+- Sign in using your account, or
+- Continue with **Demo Mode** for testing the product.
 
 ### 3. Set Up Brand DNA
-Open **Brand DNA** and add your brand information, including:
+Add the brand's:
 - Brand guidelines
 - Approved facts
-- Brand preferences and assets
+- Brand assets
+- Tone and messaging rules
 
-This information is used as context during content review.
+### 4. Upload Content
+Go to the **Auditor** and submit the content you want to check.
 
-### 4. Audit Content
-Open **Content Auditor** and enter the marketing/content copy you want to check.
-
-BLACKSHIP analyzes the content against the configured brand rules and identifies potential issues such as:
-- Brand guideline violations
-- Unsupported or problematic claims
-- Inconsistent messaging
+BLACKSHIP analyzes the content for:
+- Brand consistency
+- Unsupported claims
+- Policy violations
+- Content issues
 
 ### 5. Review AI Findings
-Check the audit score, detected violations, explanations, and suggested correction.
+Review the detected violations, score, and explanations.
 
 ### 6. Use Smart Corrections
-When a correction is available, you can:
-- **Apply** the suggested correction
-- **Edit & Apply** the correction before using it
+BLACKSHIP provides a context-aware rewritten suggestion.
+
+You can:
+- **Apply** the correction
+- **Edit & Apply** the suggestion
 - **Ignore** the suggestion
 
-After applying or editing a correction, BLACKSHIP re-audits the updated content.
+The corrected content is re-audited before final review.
 
-### 7. Make a Human Review Decision
-Reviewers can record a final decision:
-- **Approved**
-- **Rejected**
-- **Changes Requested**
+### 7. Review and Decide
+A reviewer can:
+- Approve
+- Reject
+- Request changes
 
-For non-approved decisions, a reviewer note can be added to explain the decision.
+Reviewer notes and decision timestamps are stored with the audit.
 
 ### 8. Use Brand Memory
-Open **Brand Memory** to view previous human review decisions and similar past audits.
+BLACKSHIP keeps previous human decisions as review context.
 
-Previous decisions are shown as review context when similar content is encountered again, helping maintain consistency without automatically deciding the new audit.
+When similar content is reviewed again, previous decisions and reviewer notes can be viewed as context for more consistent reviews.
 
-### 9. View Audit History
-Open **Audit History** to review saved audits, including:
+### 9. Check Audit History
+Use **Audit History** to view:
 - Original content
-- Audit score and violations
+- Violations
 - Suggested corrections
-- Applied/edited corrections
-- Review decisions
+- Applied corrections
+- Reviewer decisions
 - Reviewer notes
-- Decision timestamps
+- Timestamps
 
-### 10. Reports & Export
-Use the **Reports** section to review saved audit and review activity and export audit information when required.
-
-### Typical Workflow
-
-**Brand DNA → Content Audit → AI Analysis → Smart Corrections → Human Review → Brand Memory / Audit History**
-
-BLACKSHIP is designed so that a reviewer can complete the full content-governance workflow without requiring a separate walkthrough.
-
+### 10. Export Reports
+Use the Reports section to review audit metrics and export the review data as a JSON report.
 ## Core Product Capabilities
 
 ### Brand DNA
