@@ -9,7 +9,8 @@ Live Product Link : https://www.oneblackship.xyz/
 ### 1. Open BLACKSHIP
 Open the deployed BLACKSHIP website and enter the workspace through **Get Started**.
 
-![BLACKSHIP Landing Page]("C:\Users\anshuman\OneDrive\Pictures\Screenshots\Screenshot 2026-11-12 160228.png")
+![Uploading image.png…]()
+
 
 ### 2. Sign In / Demo Mode
 - Sign in using your account, or
